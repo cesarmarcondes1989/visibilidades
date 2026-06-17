@@ -89,6 +89,10 @@ let graph        = null;  // instância ForceGraph
 let _fh          = null;  // FileSystemFileHandle
 let _fupTab      = "acomp"; // sub-tab ativo no FUP
 let _ganttOpen   = true;  // estado expandido/recolhido do Gantt no Portfolio
+let ganttDateFrom = null; // filtro de período do Gantt (string yyyy-mm-dd ou null), não persistido
+let ganttDateTo   = null; // idem, data final
+let ganttStatusFilter = new Set(); // filtro multi-seleção por status do Gantt, não persistido (vazio = todos)
+let ganttPillarFilter = new Set(); // filtro multi-seleção por pilar do Gantt, não persistido (vazio = todos)
 ```
 
 ---
@@ -170,7 +174,8 @@ Qualquer edição → save() → debounce 700ms → _write()
 | `renderDados()` | Aba Data Strategy |
 | `renderGrafo()` | Aba Graph |
 | `renderPortfolio()` | Aba Portfolio (KPIs + Gantt + kanban por horizonte) |
-| `renderGanttPortfolio()` | Desenha o Gantt de todos os projetos (agrupado por horizonte, com linha de "hoje") dentro de `#gantt-chart` |
+| `renderGanttPortfolio()` | Desenha o Gantt de todos os projetos (agrupado por horizonte, com linha de "hoje") dentro de `#gantt-chart`, aplicando `ganttDateFrom/To` + `ganttStatusFilter` + `ganttPillarFilter` |
+| `renderGanttFilters()` | Desenha os controles de filtro do Gantt (período, status, pilar) dentro de `#gantt-filters` e religa os handlers |
 | `toggleGantt()` | Expande/recolhe a seção do Gantt (`_ganttOpen`), sem afetar o estado persistido |
 | `projRange(p)` | Resolve `{s,e}` (Date) efetivos de um projeto a partir de `p.start`/`p.end`, com fallback de ~3 meses quando faltam datas |
 | `_pdate(s)` | Helper: converte string em `Date` válido ou `null` |
@@ -187,7 +192,7 @@ Qualquer edição → save() → debounce 700ms → _write()
 | Função | Abre painel para |
 |----------|----------------|
 | `openBet(id)` | Strategic bet (null = novo) |
-| `openDP(id)` | Data product (null = novo) |
+| `openDP(id)` | Data product (null = novo) — **não usa o side panel**, abre o modal centralizado (`#dpModalWrap`/`openDPModal()`/`closeDPModal()`), ver "Data Strategy — Modal central do Data Product" abaixo |
 | `openGov(i)` | Governance capability por index |
 | `openMatPanel(i)` | Maturity dimension por index |
 | `openProject(id)` | Portfolio project (null = novo) |
@@ -218,6 +223,21 @@ Usa `<meter>` HTML nativo (não `<div>`) com CSS customizado via `::-webkit-mete
 
 ### Portfolio — Gantt de todos os projetos
 A aba Portfolio tem uma seção de Gantt (`renderGanttPortfolio()`) acima do board de cards, agrupada por horizonte (Now/Scale/Differentiation), com linha vertical de "hoje" e ticks de tempo adaptativos (mensal, bimestral, trimestral ou semestral conforme o intervalo total). É recolhível via `toggleGantt()` (estado `_ganttOpen`, não persistido). Clicar numa barra ou no nome do projeto (`.g-bar`/`.g-label`) abre o mesmo painel de edição (`openProject`) usado pelos cards — não há uma visão separada "somente leitura". Projetos sem `start`/`end` cadastrados recebem um intervalo padrão de ~3 meses (`projRange()`) só para exibição; os campos no Excel continuam vazios até o usuário editar.
+
+### Portfolio — Filtros do Gantt
+Acima do gráfico (`#gantt-filters`, desenhado por `renderGanttFilters()`) há três grupos de filtro, todos em estado runtime não persistido:
+- **Período** (`ganttDateFrom`/`ganttDateTo`, inputs `<input type=date>` com `onchange`): quando preenchido, define o início/fim da janela visível do Gantt (em vez do range calculado automaticamente a partir dos projetos) e esconde projetos cujo intervalo não tem overlap com o período escolhido. Botão "Limpar" aparece só quando algum dos dois está preenchido.
+- **Status** (`ganttStatusFilter`, `Set` com os valores de `STLIST`): chips estilo `.chip` com toggle multi-seleção (clique adiciona/remove do Set); chip "All" limpa o Set. Set vazio = sem filtro (mostra todos os status).
+- **Pilar** (`ganttPillarFilter`, `Set` com `pillar.id`): mesmo padrão de chips multi-seleção, usando o array `pillars` (cores reais por pilar).
+Os três filtros se combinam (AND) dentro de `renderGanttPortfolio()`, que filtra `projects` antes de calcular `ranges`/`minD`/`maxD`. Os cliques nos chips são capturados pelo listener delegado em `#view-portfolio` (`[data-gst]`/`[data-gpl]`), que chama `renderGanttPortfolio()` a cada toggle.
+
+### Data Strategy — Modal central do Data Product
+Clicar numa linha `.dp-row` (ou no botão "+ Data Product") chama `openDP(id)`, que **não usa mais o side panel** (`#scrim`/`#panel`) — em vez disso abre um modal centralizado (`#dpModalWrap` → `.cmodal`), com `openDPModal()`/`closeDPModal()` análogos a `openPanel()`/`closePanel()`. Estrutura do modal:
+- `#dpModalHead`: faixa colorida (gradiente na cor do domain), nome do produto, owner, badges de status/horizonte/SLA.
+- `#dpModalStats`: 3 colunas com Quality, Revenue/consumidores e Domain (omitido ao criar um produto novo).
+- `#dpModalBody`: grid 2 colunas com os campos editáveis (`fld`/`sel`/`sldr`) + Notes (`ta`) + checkbox de SLA — mesma lógica de save/delete de antes.
+- `#dpModalFoot`: botões Save/Delete/Close.
+Fecha com o botão "✕", o botão "Close", clique fora do card (no scrim) ou Esc. Como `gv(k, root)` e `bindSliders(root)` agora aceitam um `root` opcional (default `panel`), `openDP` passa o `#dpModalBody` como root para ler/ligar os campos sem depender do side panel.
 
 ### FUP — dois tipos
 - **`tipo: "acomp"`** — atividades de acompanhamento com Título, Responsável, Prazo, Prioridade, Status, checkbox "👁 Acompanhar". Renderizado em kanban por status.
