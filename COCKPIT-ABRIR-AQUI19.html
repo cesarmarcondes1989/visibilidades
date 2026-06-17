@@ -277,7 +277,7 @@ button:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
 .xbtn:hover{background:var(--s2);color:var(--text)}
 .fld{margin-bottom:16px}
 .fld label{display:block;font-size:11px;font-weight:600;color:var(--muted);letter-spacing:.04em;text-transform:uppercase;margin-bottom:6px}
-.fld input[type=text],.fld select,.fld textarea,.fld input[type=number]{width:100%;background:var(--s);border:1px solid var(--border);color:var(--text);border-radius:9px;padding:10px 12px;font-family:'Inter',sans-serif;font-size:13px;box-shadow:0 1px 2px rgba(0,0,0,.04)}
+.fld input[type=text],.fld select,.fld textarea,.fld input[type=number],.fld input[type=date]{width:100%;background:var(--s);border:1px solid var(--border);color:var(--text);border-radius:9px;padding:10px 12px;font-family:'Inter',sans-serif;font-size:13px;box-shadow:0 1px 2px rgba(0,0,0,.04)}
 .fld textarea{resize:vertical;min-height:80px;line-height:1.5}
 .fld input:focus,.fld select:focus,.fld textarea:focus{outline:none;border-color:var(--acc);box-shadow:0 0 0 3px rgba(79,112,245,.12)}
 .sl-row{display:flex;align-items:center;gap:12px}
@@ -308,6 +308,11 @@ button:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
 .cmodal-foot{display:flex;gap:8px;padding:16px 26px;border-top:1px solid var(--border);background:var(--s2)}
 .cmodal-foot button{flex:1}
 @media (max-width:560px){.cmodal-grid,.cmodal-stats{grid-template-columns:1fr}}
+.dp-subs-head{display:flex;justify-content:space-between;align-items:center;margin:24px 0 12px;padding-top:18px;border-top:1px solid var(--border)}
+.dp-subs-head h4{font-size:13px;font-weight:700}
+.dp-subs-empty{text-align:center;padding:18px;color:var(--muted);font-size:12.5px;background:var(--s2);border-radius:10px}
+.dp-subform{background:var(--s2);border:1px solid var(--border);border-radius:12px;padding:16px;margin-top:12px}
+.dp-subform .fld{margin-bottom:12px}
 
 /* TOAST */
 .toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%) translateY(16px);background:var(--text);color:var(--bg);font-size:12.5px;font-weight:500;padding:10px 18px;border-radius:10px;opacity:0;pointer-events:none;transition:.22s;z-index:60;box-shadow:var(--shadow-md)}
@@ -768,12 +773,13 @@ const DEFAULT_MEL = [
 ];
 
 // ══ STATE ════════════════════════════════════════════════════════════
-let vision={}, bets=[], dp=[], maturity=[], governance=[], gNodes=[], gEdges=[];
+let vision={}, bets=[], dp=[], dpSubs=[], maturity=[], governance=[], gNodes=[], gEdges=[];
 let projects=[], mel=[], dataVision={}, principles=[];
 let budget=[], fup=[];
 let betFilter=null, graphFilter=null, currentTab="visao", graph=null, _ganttOpen=true;
 let ganttDateFrom=null, ganttDateTo=null, ganttStatusFilter=new Set(), ganttPillarFilter=new Set();
 let editCtx=null;
+let _dpSubEdit=null; // null | "new" | id do subprojeto em edição no modal de Data Product
 
 // ══ PERSISTÊNCIA · File System Access API + SheetJS (embutido) ════════
 // Funciona 100% offline · Chrome/Edge 86+ · sem servidor
@@ -828,7 +834,7 @@ function refreshDMAP(){
 }
 
 function seedAll(){
-  vision=clone(DEFAULT_VISION); bets=clone(DEFAULT_BETS); dp=clone(DEFAULT_DP);
+  vision=clone(DEFAULT_VISION); bets=clone(DEFAULT_BETS); dp=clone(DEFAULT_DP); dpSubs=[];
   maturity=clone(DEFAULT_MATURITY); governance=clone(DEFAULT_GOVERNANCE);
   gNodes=clone(DEFAULT_NODES); gEdges=clone(DEFAULT_EDGES);
   projects=clone(DEFAULT_PROJECTS); mel=clone(DEFAULT_MEL);
@@ -842,6 +848,7 @@ function seedAll(){
 const SH={
   bets:         ["id","hz","pillar","name","intent","porque","enablerDados","enablerTech","metrica","meta","atual","status"],
   data_products:["id","domain","name","owner","q","cons","status","horizon","sla","notas"],
+  dp_subs:      ["id","dpId","name","status","prog","start","end"],
   maturity:     ["id","name","atual","alvo","owner"],
   governance:   ["name","atual","alvo","owner","note"],
   projects:     ["id","hz","pillar","bet","name","descr","inv","rec","prog","status","start","end"],
@@ -902,6 +909,7 @@ function buildWB(){
   add("principles",   _list2ws(principles,SH.principles));
   add("bets",         _list2ws(bets,       SH.bets));
   add("data_products",_list2ws(dp,         SH.data_products));
+  add("dp_subs",      _list2ws(dpSubs,     SH.dp_subs));
   add("maturity",     _list2ws(maturity,   SH.maturity));
   add("governance",   _list2ws(governance, SH.governance));
   add("projects",     _list2ws(projects,   SH.projects));
@@ -924,6 +932,7 @@ function parseWB(wb){
     vision:vis, dataVision:dv,
     bets:          _list(wb,"bets"),
     data_products: _list(wb,"data_products"),
+    dp_subs:       _list(wb,"dp_subs"),
     maturity:      _list(wb,"maturity"),
     governance:    _list(wb,"governance"),
     projects:      _list(wb,"projects"),
@@ -946,6 +955,7 @@ function applyData(o){
     if(!Array.isArray(vision.diagNegative))vision.diagNegative=clone(DEFAULT_VISION.diagNegative);}
   if(o.bets?.length)                   bets       =o.bets;
   if(o.data_products?.length)          dp         =o.data_products;
+  if(o.dp_subs?.length)                dpSubs     =o.dp_subs;
   if(o.maturity?.length)               maturity   =o.maturity;
   if(o.governance?.length)             governance =o.governance;
   if(o.graph_nodes?.length)            gNodes     =o.graph_nodes;
@@ -1296,6 +1306,57 @@ function toggleGantt(){
   document.getElementById("gantt-body").classList.toggle("collapsed",!_ganttOpen);
   document.getElementById("gantt-chevron").classList.toggle("closed",!_ganttOpen);
 }
+// items: [{id,name,status,prog,s,e,groupId?}] · groups: [{id,name,color}] opcional
+function buildGanttGrid(items,{dataAttr="id",groups=null,minD:fMin,maxD:fMax}={}){
+  if(!items.length)return "";
+  let minD=fMin||new Date(Math.min(...items.map(r=>+r.s)));
+  let maxD=fMax||new Date(Math.max(...items.map(r=>+r.e)));
+  minD=new Date(minD.getFullYear(),minD.getMonth(),1);
+  maxD=new Date(maxD.getFullYear(),maxD.getMonth()+1,0);
+  const totalMs=maxD-minD||1;
+  const pct=d=>Math.max(0,Math.min(100,(d-minD)/totalMs*100));
+  const spanMonths=(maxD.getFullYear()-minD.getFullYear())*12+(maxD.getMonth()-minD.getMonth())+1;
+  const step=spanMonths<=8?1:spanMonths<=18?2:spanMonths<=36?3:6;
+  const ticks=[];
+  for(let i=0;;i++){
+    const cur=new Date(minD.getFullYear(),minD.getMonth()+i*step,1);
+    if(cur>maxD)break;
+    ticks.push(cur);
+  }
+  const today=new Date();
+  const todayPct=(today>=minD&&today<=maxD)?pct(today):null;
+  const fmtTick=t=>t.getMonth()===0
+    ?t.toLocaleDateString("pt-BR",{month:"short"})+" '"+String(t.getFullYear()).slice(-2)
+    :t.toLocaleDateString("pt-BR",{month:"short"});
+  const gridMinW=Math.max(680,GANTT_LABEL_W+ticks.length*70);
+  const head=`<div class="g-row g-head">
+    <div class="g-label"></div>
+    <div class="g-track">${ticks.map(t=>`<div class="g-tick" style="left:${pct(t).toFixed(3)}%">${fmtTick(t)}</div>`).join("")}</div>
+  </div>`;
+  const rowHTML=r=>{
+    const sc=STATUS_COLORS[r.status]||"#94A3B8";
+    const left=pct(r.s),width=Math.max(1.5,pct(r.e)-left);
+    const prog=Math.min(100,+r.prog||0);
+    return `<div class="g-row">
+      <button class="g-label" data-${dataAttr}="${r.id}" title="${r.name}">${r.name}</button>
+      <div class="g-track">
+        <button class="g-bar" data-${dataAttr}="${r.id}" style="left:${left.toFixed(3)}%;width:${width.toFixed(3)}%;background:${sc}55" title="${r.name} — ${r.status} — ${prog}%">
+          <span class="g-bar-fill" style="width:${prog}%;background:${sc}"></span>
+          <span class="g-bar-text">${prog}%</span>
+        </button>
+      </div>
+    </div>`;
+  };
+  const rows=groups
+    ?groups.map(g=>{
+      const gi=items.filter(r=>r.groupId===g.id);
+      if(!gi.length)return "";
+      return `<div class="g-group-label" style="color:${g.color}"><span class="g-dot" style="background:${g.color}"></span>${g.name}</div>`+gi.map(rowHTML).join("");
+    }).join("")
+    :items.map(rowHTML).join("");
+  const todayLine=todayPct!=null?`<div class="g-today" style="left:calc(${GANTT_LABEL_W}px + (100% - ${GANTT_LABEL_W}px) * ${(todayPct/100).toFixed(4)})" title="Hoje"></div>`:"";
+  return `<div class="gantt-grid" style="min-width:${gridMinW}px">${head}${rows}${todayLine}</div>`;
+}
 function renderGanttFilters(){
   const wrap=document.getElementById("gantt-filters");
   if(!wrap)return;
@@ -1337,55 +1398,8 @@ function renderGanttPortfolio(){
     box.innerHTML=`<div style="text-align:center;padding:30px;color:var(--muted);font-size:13px">Nenhum projeto corresponde aos filtros selecionados.</div>`;
     return;
   }
-  let minD=fFrom||new Date(Math.min(...ranges.map(r=>+r.s)));
-  let maxD=fTo||new Date(Math.max(...ranges.map(r=>+r.e)));
-  minD=new Date(minD.getFullYear(),minD.getMonth(),1);
-  maxD=new Date(maxD.getFullYear(),maxD.getMonth()+1,0);
-  const totalMs=maxD-minD||1;
-  const pct=d=>Math.max(0,Math.min(100,(d-minD)/totalMs*100));
-  const spanMonths=(maxD.getFullYear()-minD.getFullYear())*12+(maxD.getMonth()-minD.getMonth())+1;
-  const step=spanMonths<=8?1:spanMonths<=18?2:spanMonths<=36?3:6;
-  const ticks=[];
-  for(let i=0;;i++){
-    const cur=new Date(minD.getFullYear(),minD.getMonth()+i*step,1);
-    if(cur>maxD)break;
-    ticks.push(cur);
-  }
-  const today=new Date();
-  const todayPct=(today>=minD&&today<=maxD)?pct(today):null;
-  const fmtTick=t=>t.getMonth()===0
-    ?t.toLocaleDateString("pt-BR",{month:"short"})+" '"+String(t.getFullYear()).slice(-2)
-    :t.toLocaleDateString("pt-BR",{month:"short"});
-  const gridMinW=Math.max(680,GANTT_LABEL_W+ticks.length*70);
-
-  const head=`<div class="g-row g-head">
-    <div class="g-label"></div>
-    <div class="g-track">${ticks.map(t=>`<div class="g-tick" style="left:${pct(t).toFixed(3)}%">${fmtTick(t)}</div>`).join("")}</div>
-  </div>`;
-
-  const rows=HZ.map(h=>{
-    const hp=ranges.filter(r=>r.p.hz===h.id);
-    if(!hp.length)return "";
-    const groupHead=`<div class="g-group-label" style="color:${h.color}"><span class="g-dot" style="background:${h.color}"></span>${h.name}</div>`;
-    const body=hp.map(r=>{
-      const p=r.p,sc=STATUS_COLORS[p.status]||"#94A3B8";
-      const left=pct(r.s),width=Math.max(1.5,pct(r.e)-left);
-      const prog=Math.min(100,+p.prog||0);
-      return `<div class="g-row">
-        <button class="g-label" data-pid="${p.id}" title="${p.name}">${p.name}</button>
-        <div class="g-track">
-          <button class="g-bar" data-pid="${p.id}" style="left:${left.toFixed(3)}%;width:${width.toFixed(3)}%;background:${sc}55" title="${p.name} — ${p.status} — ${prog}%">
-            <span class="g-bar-fill" style="width:${prog}%;background:${sc}"></span>
-            <span class="g-bar-text">${prog}%</span>
-          </button>
-        </div>
-      </div>`;
-    }).join("");
-    return groupHead+body;
-  }).join("");
-
-  const todayLine=todayPct!=null?`<div class="g-today" style="left:calc(${GANTT_LABEL_W}px + (100% - ${GANTT_LABEL_W}px) * ${(todayPct/100).toFixed(4)})" title="Hoje"></div>`:"";
-  box.innerHTML=`<div class="gantt-grid" style="min-width:${gridMinW}px">${head}${rows}${todayLine}</div>`;
+  const items=ranges.map(r=>({id:r.p.id,name:r.p.name,status:r.p.status,prog:r.p.prog,s:r.s,e:r.e,groupId:r.p.hz}));
+  box.innerHTML=buildGanttGrid(items,{dataAttr:"pid",groups:HZ,minD:fFrom,maxD:fTo});
 }
 
 // ══ RENDER PORTFOLIO ═════════════════════════════════════════════════
@@ -2023,7 +2037,7 @@ function gv(k,root=panel){const el=root.querySelector(`[data-k="${k}"]`);if(!el)
 // ══ CENTER MODAL (Data Product detail) ═════════════════════════════════
 const dpModalWrap=document.getElementById("dpModalWrap");
 function openDPModal(){dpModalWrap.classList.add("on");dpModalWrap.setAttribute("aria-hidden","false");}
-function closeDPModal(){dpModalWrap.classList.remove("on");dpModalWrap.setAttribute("aria-hidden","true");editCtx=null;}
+function closeDPModal(){dpModalWrap.classList.remove("on");dpModalWrap.setAttribute("aria-hidden","true");editCtx=null;_dpSubEdit=null;}
 dpModalWrap.addEventListener("click",e=>{if(e.target===dpModalWrap)closeDPModal();});
 
 function openBet(id){
@@ -2085,7 +2099,9 @@ function openDP(id){
       fld("# revenue / consumidores","cons",d.cons||0,"number")+
     `</div>`+
     ta("Notes","notas",d.notas)+
-    `<div class="fld"><label style="display:flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" data-k="sla" ${d.sla?"checked":""}> Tem SLA / contrato de dados</label></div>`;
+    `<div class="fld"><label style="display:flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" data-k="sla" ${d.sla?"checked":""}> Tem SLA / contrato de dados</label></div>`+
+    `<div class="dp-subs-head"><h4>Subprojetos</h4>${!isNew?'<button class="soft" id="dpSubAddBtn" style="font-size:12px;padding:6px 12px">+ Subprojeto</button>':""}</div>`+
+    `<div id="dpSubsArea"></div>`;
 
   document.getElementById("dpModalFoot").innerHTML=`<button class="primary" id="dpSvBtn">Save</button>${!isNew?`<button class="danger" id="dpDlBtn">Delete</button>`:""}<button class="ghost" id="dpClBtn">Close</button>`;
   bindSliders(body);
@@ -2096,9 +2112,59 @@ function openDP(id){
     if(isNew){dp.push({id:"dp"+Date.now(),...o});toast("Added");}else{Object.assign(dp.find(x=>x.id===id),o);toast("Saved");}
     save();renderDados();closeDPModal();
   };
-  if(!isNew)document.getElementById("dpDlBtn").onclick=()=>{if(confirm("Delete?")){dp=dp.filter(x=>x.id!==id);save();renderDados();closeDPModal();toast("Deleted");}};
+  if(!isNew)document.getElementById("dpDlBtn").onclick=()=>{if(confirm("Delete?")){dp=dp.filter(x=>x.id!==id);dpSubs=dpSubs.filter(s=>s.dpId!==id);save();renderDados();closeDPModal();toast("Deleted");}};
+  if(!isNew)document.getElementById("dpSubAddBtn").onclick=()=>{_dpSubEdit="new";renderDPSubsArea(id);};
+  renderDPSubsArea(id);
   openDPModal();
 }
+function renderDPSubsArea(dpId){
+  const area=document.getElementById("dpSubsArea");
+  if(!area)return;
+  if(!dpId){area.innerHTML=`<div class="dp-subs-empty">Salve o produto antes de adicionar subprojetos.</div>`;return;}
+  const subs=dpSubs.filter(s=>s.dpId===dpId);
+  let html="";
+  if(subs.length){
+    const items=subs.map(s=>({id:s.id,name:s.name,status:s.status,prog:s.prog,...projRange(s)}));
+    html+=`<div style="overflow-x:auto">${buildGanttGrid(items,{dataAttr:"sid"})}</div>`;
+  }else{
+    html+=`<div class="dp-subs-empty">Nenhum subprojeto cadastrado ainda.</div>`;
+  }
+  if(_dpSubEdit){
+    const s=_dpSubEdit==="new"?{}:subs.find(x=>x.id===_dpSubEdit)||{};
+    html+=`<div class="dp-subform">
+      ${fld("Nome do subprojeto","sb_name",s.name)}
+      <div class="cmodal-grid">
+        ${sel("Status","sb_status",s.status||"Exploration",STLIST)}
+        ${sldr("Progresso (%)","sb_prog",s.prog||0,0,100)}
+        ${fld("Início","sb_start",s.start,"date")}
+        ${fld("Fim","sb_end",s.end,"date")}
+      </div>
+      <div style="display:flex;gap:8px">
+        <button class="primary" id="dpSubSaveBtn" style="flex:1">Salvar subprojeto</button>
+        ${_dpSubEdit!=="new"?`<button class="danger" id="dpSubDelBtn">Excluir</button>`:""}
+        <button class="ghost" id="dpSubCancelBtn">Cancelar</button>
+      </div>
+    </div>`;
+  }
+  area.innerHTML=html;
+  bindSliders(area);
+  if(_dpSubEdit){
+    document.getElementById("dpSubSaveBtn").onclick=()=>{
+      const o={dpId,name:gv("sb_name",area),status:gv("sb_status",area),prog:+gv("sb_prog",area),start:gv("sb_start",area),end:gv("sb_end",area)};
+      if(_dpSubEdit==="new"){dpSubs.push({id:"dps"+Date.now(),...o});toast("Subprojeto adicionado");}
+      else{Object.assign(dpSubs.find(x=>x.id===_dpSubEdit),o);toast("Subprojeto salvo");}
+      save();_dpSubEdit=null;renderDPSubsArea(dpId);
+    };
+    if(_dpSubEdit!=="new")document.getElementById("dpSubDelBtn").onclick=()=>{
+      if(confirm("Excluir subprojeto?")){dpSubs=dpSubs.filter(x=>x.id!==_dpSubEdit);save();_dpSubEdit=null;renderDPSubsArea(dpId);toast("Excluído");}
+    };
+    document.getElementById("dpSubCancelBtn").onclick=()=>{_dpSubEdit=null;renderDPSubsArea(dpId);};
+  }
+  area.querySelectorAll("[data-sid]").forEach(el=>{
+    el.onclick=()=>{_dpSubEdit=el.dataset.sid;renderDPSubsArea(dpId);};
+  });
+}
+
 function openGov(i){
   const g=governance[i];editCtx={type:"gov",i};
   document.getElementById("panelTitle").textContent="Governance Capability";

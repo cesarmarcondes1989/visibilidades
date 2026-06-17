@@ -68,6 +68,7 @@ Todo o estado mutável vive em globals JS, persistido no Excel a cada mudança (
 let vision       = {};    // strategic intent, northStar, themes, diagPositive/Negative
 let bets         = [];    // strategic bets (horizons H1/H2/H3)
 let dp           = [];    // data products catalog
+let dpSubs       = [];    // subprojetos de cada data product (fk dpId), tracking de implementação
 let maturity     = [];    // governance maturity dimensions
 let governance   = [];    // governance capability cards
 let gNodes       = [];    // graph nodes (apenas não-projeto; projetos são derivados)
@@ -93,6 +94,7 @@ let ganttDateFrom = null; // filtro de período do Gantt (string yyyy-mm-dd ou n
 let ganttDateTo   = null; // idem, data final
 let ganttStatusFilter = new Set(); // filtro multi-seleção por status do Gantt, não persistido (vazio = todos)
 let ganttPillarFilter = new Set(); // filtro multi-seleção por pilar do Gantt, não persistido (vazio = todos)
+let _dpSubEdit   = null;  // null | "new" | id do subprojeto em edição no modal de Data Product, não persistido
 ```
 
 ---
@@ -107,6 +109,7 @@ let ganttPillarFilter = new Set(); // filtro multi-seleção por pilar do Gantt,
 | `principles` | Data principles | `icon`, `name`, `desc` |
 | `bets` | Strategic bets | `id`, `hz`, `pillar`, `name`, `intent`, `porque`, `enablerDados`, `enablerTech`, `metrica`, `meta`, `atual`, `status` |
 | `data_products` | Data products | `id`, `domain`, `name`, `owner`, `q`, `cons`, `status`, `horizon`, `sla`, `notas` |
+| `dp_subs` | Subprojetos de cada data product | `id`, `dpId`, `name`, `status`, `prog`, `start`, `end` |
 | `maturity` | Governance maturity | `id`, `name`, `atual`, `alvo`, `owner` |
 | `governance` | Governance capabilities | `name`, `atual`, `alvo`, `owner`, `note` |
 | `projects` | Portfolio projects | `id`, `hz`, `pillar`, `bet`, `name`, `descr`, `inv`, `rec`, `prog`, `status`, `start`, `end` |
@@ -177,6 +180,8 @@ Qualquer edição → save() → debounce 700ms → _write()
 | `renderGanttPortfolio()` | Desenha o Gantt de todos os projetos (agrupado por horizonte, com linha de "hoje") dentro de `#gantt-chart`, aplicando `ganttDateFrom/To` + `ganttStatusFilter` + `ganttPillarFilter` |
 | `renderGanttFilters()` | Desenha os controles de filtro do Gantt (período, status, pilar) dentro de `#gantt-filters` e religa os handlers |
 | `toggleGantt()` | Expande/recolhe a seção do Gantt (`_ganttOpen`), sem afetar o estado persistido |
+| `buildGanttGrid(items, opts)` | Função genérica que desenha a grade de um Gantt (eixo de datas, ticks adaptativos, barras, linha de "hoje") a partir de uma lista normalizada `{id,name,status,prog,s,e,groupId?}`; usada tanto por `renderGanttPortfolio()` (com `groups:HZ`) quanto por `renderDPSubsArea()` (sem groups) |
+| `renderDPSubsArea(dpId)` | Desenha dentro de `#dpSubsArea` (no modal do Data Product) o mini-Gantt dos subprojetos daquele produto + o formulário inline de criação/edição quando `_dpSubEdit` está ativo |
 | `projRange(p)` | Resolve `{s,e}` (Date) efetivos de um projeto a partir de `p.start`/`p.end`, com fallback de ~3 meses quando faltam datas |
 | `_pdate(s)` | Helper: converte string em `Date` válido ou `null` |
 | `renderMelhorias()` | Aba Improvements & SF |
@@ -238,6 +243,15 @@ Clicar numa linha `.dp-row` (ou no botão "+ Data Product") chama `openDP(id)`, 
 - `#dpModalBody`: grid 2 colunas com os campos editáveis (`fld`/`sel`/`sldr`) + Notes (`ta`) + checkbox de SLA — mesma lógica de save/delete de antes.
 - `#dpModalFoot`: botões Save/Delete/Close.
 Fecha com o botão "✕", o botão "Close", clique fora do card (no scrim) ou Esc. Como `gv(k, root)` e `bindSliders(root)` agora aceitam um `root` opcional (default `panel`), `openDP` passa o `#dpModalBody` como root para ler/ligar os campos sem depender do side panel.
+
+### Data Strategy — Subprojetos do Data Product
+Dentro do modal do Data Product, abaixo do checkbox de SLA, há uma seção "Subprojetos" (`#dpSubsArea`, desenhada por `renderDPSubsArea(dpId)`) que permite quebrar o produto em itens menores e acompanhar o que está sendo implementado — mesma proposta do Gantt do Portfolio, só que individualizada por produto:
+- Armazenados em `dpSubs` (`{id, dpId, name, status, prog, start, end}`), persistidos na sheet `dp_subs` com FK `dpId`. Reusam o vocabulário de status `STLIST` (Active/Bet/Exploration/Done/Paused/At Risk) e a mesma lógica de fallback de datas `projRange()` usada pelos projetos do Portfolio.
+- Se já existem subprojetos, são desenhados como um mini-Gantt via `buildGanttGrid(items, {dataAttr:"sid"})` (sem agrupamento por horizonte). Clicar numa barra/label (`[data-sid]`) abre o formulário inline de edição daquele subprojeto.
+- O botão "+ Subprojeto" (`#dpSubAddBtn`) seta `_dpSubEdit="new"` e mostra o formulário inline (`.dp-subform`) com nome, status, progresso (slider) e datas de início/fim — sem abrir um segundo modal sobreposto.
+- Salvar/excluir um subprojeto chama `save()` imediatamente (não depende do botão "Save" do produto). `_dpSubEdit` é resetado ao salvar, cancelar, fechar o modal (`closeDPModal()`) ou ao trocar de subprojeto.
+- Um Data Product **novo e ainda não salvo** não pode ter subprojetos — a área mostra "Salve o produto antes de adicionar subprojetos." e o botão "+ Subprojeto" não aparece (subprojetos dependem de um `dpId` já existente).
+- Excluir um Data Product remove em cascata todos os seus `dpSubs` (`dpSubs=dpSubs.filter(s=>s.dpId!==id)` dentro do handler de `dpDlBtn`).
 
 ### FUP — dois tipos
 - **`tipo: "acomp"`** — atividades de acompanhamento com Título, Responsável, Prazo, Prioridade, Status, checkbox "👁 Acompanhar". Renderizado em kanban por status.
