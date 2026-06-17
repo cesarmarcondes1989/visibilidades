@@ -230,6 +230,12 @@ button:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
 .gantt-sub{font-size:11.5px;color:var(--faint);margin-left:auto}
 .gantt-body{padding:8px 18px 18px;border-top:1px solid var(--border);overflow-x:auto}
 .gantt-body.collapsed{display:none}
+.gantt-filters{display:flex;flex-wrap:wrap;gap:18px 26px;align-items:flex-start;padding:14px 2px 18px;border-bottom:1px solid var(--border);margin-bottom:14px}
+.gf-group{display:flex;flex-direction:column;gap:7px}
+.gf-label{font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+.gf-daterow{display:flex;align-items:center;gap:7px}
+.gf-daterow input[type=date]{font-family:'Inter',sans-serif;font-size:12.5px;border:1px solid var(--border);border-radius:8px;padding:6px 9px;background:var(--s);color:var(--text)}
+.gf-daterow input[type=date]:focus{outline:none;border-color:var(--acc);box-shadow:0 0 0 3px rgba(79,112,245,.12)}
 .gantt-grid{position:relative;min-width:680px}
 .g-row{display:grid;grid-template-columns:200px 1fr;align-items:center}
 .g-group-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;display:flex;align-items:center;gap:7px;padding:14px 0 6px}
@@ -280,6 +286,28 @@ button:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
 .verdict{background:linear-gradient(135deg,#EEF2FF,#F0FDF9);border:1px solid #C7D2FE;border-radius:12px;padding:14px 16px;margin-bottom:18px}
 .verdict .v-label{font-size:11px;font-weight:600;color:var(--acc);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px;font-family:'IBM Plex Mono',monospace}
 .verdict p{font-size:12.5px;color:var(--muted);line-height:1.5}
+
+/* CENTER MODAL (Data Product detail) */
+.cmodal-wrap{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;padding:24px;z-index:55;opacity:0;pointer-events:none;transition:.2s}
+.cmodal-wrap.on{opacity:1;pointer-events:auto}
+.cmodal{background:var(--s);border-radius:var(--rad);box-shadow:var(--shadow-md);width:min(660px,94vw);max-height:88vh;display:flex;flex-direction:column;transform:translateY(14px) scale(.98);transition:transform .25s cubic-bezier(.4,0,.2,1);overflow:hidden}
+.cmodal-wrap.on .cmodal{transform:none}
+.cmodal-head{padding:24px 26px;position:relative;color:#fff}
+.cmodal-head .xbtn{position:absolute;top:14px;right:14px;color:rgba(255,255,255,.85)}
+.cmodal-head .xbtn:hover{background:rgba(255,255,255,.18);color:#fff}
+.cmodal-eyebrow{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.18em;text-transform:uppercase;opacity:.85;margin-bottom:6px}
+.cmodal-title{font-size:20px;font-weight:700;margin-bottom:4px;padding-right:30px}
+.cmodal-sub{font-size:13px;opacity:.92}
+.cmodal-badges{display:flex;gap:6px;flex-wrap:wrap;margin-top:14px}
+.cmodal-badges .badge{border-color:rgba(255,255,255,.5)!important;background:rgba(255,255,255,.16)!important;color:#fff!important}
+.cmodal-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;padding:16px 26px;border-bottom:1px solid var(--border);background:var(--s2)}
+.cmodal-stat-l{font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px}
+.cmodal-stat-v{font-size:17px;font-weight:700;font-family:'IBM Plex Mono',monospace}
+.cmodal-body{padding:22px 26px;overflow:auto;flex:1}
+.cmodal-grid{display:grid;grid-template-columns:1fr 1fr;gap:0 16px}
+.cmodal-foot{display:flex;gap:8px;padding:16px 26px;border-top:1px solid var(--border);background:var(--s2)}
+.cmodal-foot button{flex:1}
+@media (max-width:560px){.cmodal-grid,.cmodal-stats{grid-template-columns:1fr}}
 
 /* TOAST */
 .toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%) translateY(16px);background:var(--text);color:var(--bg);font-size:12.5px;font-weight:500;padding:10px 18px;border-radius:10px;opacity:0;pointer-events:none;transition:.22s;z-index:60;box-shadow:var(--shadow-md)}
@@ -449,7 +477,10 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
         <span class="gantt-title">📅 Gantt — All Projects</span>
         <span class="gantt-sub">click a bar or a name to open the project</span>
       </div>
-      <div class="gantt-body" id="gantt-body"><div id="gantt-chart"></div></div>
+      <div class="gantt-body" id="gantt-body">
+        <div class="gantt-filters" id="gantt-filters"></div>
+        <div id="gantt-chart"></div>
+      </div>
     </div>
     <div id="portfolio-board"></div>
   </div>
@@ -510,6 +541,14 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
   <div class="pb" id="panelBody"></div>
   <div class="pf" id="panelFoot"></div>
 </aside>
+<div class="cmodal-wrap" id="dpModalWrap" aria-hidden="true">
+  <div class="cmodal" role="dialog" aria-modal="true">
+    <div class="cmodal-head" id="dpModalHead"></div>
+    <div class="cmodal-stats" id="dpModalStats"></div>
+    <div class="cmodal-body" id="dpModalBody"></div>
+    <div class="cmodal-foot" id="dpModalFoot"></div>
+  </div>
+</div>
 <div class="toast" id="toast"></div>
 
 <script>
@@ -733,6 +772,7 @@ let vision={}, bets=[], dp=[], maturity=[], governance=[], gNodes=[], gEdges=[];
 let projects=[], mel=[], dataVision={}, principles=[];
 let budget=[], fup=[];
 let betFilter=null, graphFilter=null, currentTab="visao", graph=null, _ganttOpen=true;
+let ganttDateFrom=null, ganttDateTo=null, ganttStatusFilter=new Set(), ganttPillarFilter=new Set();
 let editCtx=null;
 
 // ══ PERSISTÊNCIA · File System Access API + SheetJS (embutido) ════════
@@ -1256,15 +1296,49 @@ function toggleGantt(){
   document.getElementById("gantt-body").classList.toggle("collapsed",!_ganttOpen);
   document.getElementById("gantt-chevron").classList.toggle("closed",!_ganttOpen);
 }
+function renderGanttFilters(){
+  const wrap=document.getElementById("gantt-filters");
+  if(!wrap)return;
+  const stChips=`<button class="chip${!ganttStatusFilter.size?" on":""}" data-gst="">All</button>`+
+    STLIST.map(s=>`<button class="chip${ganttStatusFilter.has(s)?" on":""}" data-gst="${s}"><span class="dot" style="background:${STATUS_COLORS[s]||"#94A3B8"}"></span>${s}</button>`).join("");
+  const plChips=`<button class="chip${!ganttPillarFilter.size?" on":""}" data-gpl="">All</button>`+
+    pillars.map(p=>`<button class="chip${ganttPillarFilter.has(p.id)?" on":""}" data-gpl="${p.id}"><span class="dot" style="background:${p.color}"></span>${p.name}</button>`).join("");
+  wrap.innerHTML=`
+    <div class="gf-group">
+      <label class="gf-label">Período</label>
+      <div class="gf-daterow">
+        <input type="date" id="gf-from" value="${ganttDateFrom||""}">
+        <span style="color:var(--faint);font-size:12px">→</span>
+        <input type="date" id="gf-to" value="${ganttDateTo||""}">
+        ${(ganttDateFrom||ganttDateTo)?`<button class="ghost" id="gf-clear-dates" style="font-size:11px;padding:5px 8px">Limpar</button>`:""}
+      </div>
+    </div>
+    <div class="gf-group"><label class="gf-label">Status</label><div class="chip-row">${stChips}</div></div>
+    <div class="gf-group"><label class="gf-label">Pilar</label><div class="chip-row">${plChips}</div></div>`;
+  document.getElementById("gf-from").onchange=e=>{ganttDateFrom=e.target.value||null;renderGanttPortfolio();};
+  document.getElementById("gf-to").onchange=e=>{ganttDateTo=e.target.value||null;renderGanttPortfolio();};
+  const clr=document.getElementById("gf-clear-dates");
+  if(clr)clr.onclick=()=>{ganttDateFrom=null;ganttDateTo=null;renderGanttPortfolio();};
+}
 function renderGanttPortfolio(){
+  renderGanttFilters();
   const box=document.getElementById("gantt-chart");
   if(!projects.length){
     box.innerHTML=`<div style="text-align:center;padding:30px;color:var(--muted);font-size:13px">Nenhum projeto cadastrado.</div>`;
     return;
   }
-  const ranges=projects.map(p=>({p,...projRange(p)}));
-  let minD=new Date(Math.min(...ranges.map(r=>+r.s)));
-  let maxD=new Date(Math.max(...ranges.map(r=>+r.e)));
+  let list=projects;
+  if(ganttStatusFilter.size)list=list.filter(p=>ganttStatusFilter.has(p.status));
+  if(ganttPillarFilter.size)list=list.filter(p=>ganttPillarFilter.has(p.pillar));
+  const fFrom=_pdate(ganttDateFrom),fTo=_pdate(ganttDateTo);
+  let ranges=list.map(p=>({p,...projRange(p)}));
+  if(fFrom||fTo)ranges=ranges.filter(r=>(!fTo||r.s<=fTo)&&(!fFrom||r.e>=fFrom));
+  if(!ranges.length){
+    box.innerHTML=`<div style="text-align:center;padding:30px;color:var(--muted);font-size:13px">Nenhum projeto corresponde aos filtros selecionados.</div>`;
+    return;
+  }
+  let minD=fFrom||new Date(Math.min(...ranges.map(r=>+r.s)));
+  let maxD=fTo||new Date(Math.max(...ranges.map(r=>+r.e)));
   minD=new Date(minD.getFullYear(),minD.getMonth(),1);
   maxD=new Date(maxD.getFullYear(),maxD.getMonth()+1,0);
   const totalMs=maxD-minD||1;
@@ -1943,8 +2017,14 @@ function fld(l,k,v,t="text"){return `<div class="fld"><label>${l}</label><input 
 function sel(l,k,v,opts){return `<div class="fld"><label>${l}</label><select data-k="${k}">${opts.map(o=>`<option value="${o.v||o}" ${(o.v||o)==v?"selected":""}>${o.t||o}</option>`).join("")}</select></div>`;}
 function ta(l,k,v){return `<div class="fld"><label>${l}</label><textarea data-k="${k}">${(v||"").replace(/</g,"&lt;")}</textarea></div>`;}
 function sldr(l,k,v,mn=0,mx=5){return `<div class="fld"><label>${l}</label><div class="sl-row"><input type="range" min="${mn}" max="${mx}" value="${v}" data-k="${k}"><span class="sl-num" id="sln_${k}">${v}</span></div></div>`;}
-function bindSliders(){panel.querySelectorAll("input[type=range]").forEach(r=>{r.oninput=()=>{const el=document.getElementById("sln_"+r.dataset.k);if(el)el.textContent=r.value+(r.dataset.k.includes("prog")?"":"")}});}
-function gv(k){const el=panel.querySelector(`[data-k="${k}"]`);if(!el)return "";return el.type==="checkbox"?el.checked:el.value;}
+function bindSliders(root=panel){root.querySelectorAll("input[type=range]").forEach(r=>{r.oninput=()=>{const el=document.getElementById("sln_"+r.dataset.k);if(el)el.textContent=r.value+(r.dataset.k.includes("prog")?"":"")}});}
+function gv(k,root=panel){const el=root.querySelector(`[data-k="${k}"]`);if(!el)return "";return el.type==="checkbox"?el.checked:el.value;}
+
+// ══ CENTER MODAL (Data Product detail) ═════════════════════════════════
+const dpModalWrap=document.getElementById("dpModalWrap");
+function openDPModal(){dpModalWrap.classList.add("on");dpModalWrap.setAttribute("aria-hidden","false");}
+function closeDPModal(){dpModalWrap.classList.remove("on");dpModalWrap.setAttribute("aria-hidden","true");editCtx=null;}
+dpModalWrap.addEventListener("click",e=>{if(e.target===dpModalWrap)closeDPModal();});
 
 function openBet(id){
   const b=bets.find(x=>x.id===id)||{};const isNew=!id;editCtx={type:"bet",id};
@@ -1975,26 +2055,49 @@ function openBet(id){
 }
 function openDP(id){
   const d=dp.find(x=>x.id===id)||{};const isNew=!id;editCtx={type:"dp",id};
-  document.getElementById("panelTitle").textContent=isNew?"Novo Data Product":"Editar Data Product";
-  document.getElementById("panelBody").innerHTML=
-    sel("Domain","domain",d.domain||"health",domains.map(x=>({v:x.id,t:x.name})))+
-    fld("Data product name","name",d.name)+
-    fld("Owner (responsible team)","owner",d.owner)+
-    sel("Status","status",d.status||"Planned",["Production","Beta","Planned","Discontinued"])+
-    sel("Horizonte","horizon",d.horizon||"h1",HZ.map(h=>({v:h.id,t:h.name})))+
-    sldr("Quality (%)","q",d.q||0,0,100)+
-    fld("# revenue","cons",d.cons||0,"number")+
+  const dom=DMAP[d.domain]||domains[0]||{name:"—",color:"#94A3B8"};
+  const sc={"Production":"#0DAF7B","Beta":"#D97706","Planned":"#4F70F5","Discontinued":"#94A3B8"}[d.status||"Planned"]||"#94A3B8";
+  const hz=HZM[d.horizon||"h1"];
+  const qc=d.q>=80?"#0DAF7B":d.q>=60?"#4F70F5":d.q>0?"#D97706":"#94A3B8";
+  const body=document.getElementById("dpModalBody");
+
+  document.getElementById("dpModalHead").style.background=`linear-gradient(135deg,${dom.color},${dom.color}cc)`;
+  document.getElementById("dpModalHead").innerHTML=`
+    <button class="xbtn" id="dpXBtn">✕</button>
+    <div class="cmodal-eyebrow">${dom.name}</div>
+    <div class="cmodal-title">${isNew?"Novo Data Product":(d.name||"—")}</div>
+    <div class="cmodal-sub">${d.owner?"Owner · "+d.owner:"Defina o owner deste produto"}</div>
+    <div class="cmodal-badges">${badgeHtml(d.status||"Planned",sc)}${hz?badgeHtml(hz.name,hz.color):""}${d.sla?badgeHtml("SLA ativo","#0DAF7B"):""}</div>`;
+
+  document.getElementById("dpModalStats").innerHTML=isNew?"":`
+    <div><div class="cmodal-stat-l">Quality</div><div class="cmodal-stat-v" style="color:${qc}">${d.q||0}%</div></div>
+    <div><div class="cmodal-stat-l">Revenue / consumidores</div><div class="cmodal-stat-v">${d.cons||0}</div></div>
+    <div><div class="cmodal-stat-l">Domain</div><div class="cmodal-stat-v" style="font-size:14px;color:${dom.color}">${dom.name}</div></div>`;
+
+  body.innerHTML=
+    `<div class="cmodal-grid">`+
+      sel("Domain","domain",d.domain||"health",domains.map(x=>({v:x.id,t:x.name})))+
+      fld("Data product name","name",d.name)+
+      fld("Owner (responsible team)","owner",d.owner)+
+      sel("Status","status",d.status||"Planned",["Production","Beta","Planned","Discontinued"])+
+      sel("Horizonte","horizon",d.horizon||"h1",HZ.map(h=>({v:h.id,t:h.name})))+
+      sldr("Quality (%)","q",d.q||0,0,100)+
+      fld("# revenue / consumidores","cons",d.cons||0,"number")+
+    `</div>`+
     ta("Notes","notas",d.notas)+
     `<div class="fld"><label style="display:flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" data-k="sla" ${d.sla?"checked":""}> Tem SLA / contrato de dados</label></div>`;
-  document.getElementById("panelFoot").innerHTML=`<button class="primary" id="svBtn">Save</button>${!isNew?`<button class="danger" id="dlBtn">Delete</button>`:""}`;
-  bindSliders();
-  document.getElementById("svBtn").onclick=()=>{
-    const o={domain:gv("domain"),name:gv("name"),owner:gv("owner"),status:gv("status"),horizon:gv("horizon"),q:+gv("q"),cons:+gv("cons"),sla:!!panel.querySelector("[data-k=sla]")?.checked,notas:gv("notas")};
+
+  document.getElementById("dpModalFoot").innerHTML=`<button class="primary" id="dpSvBtn">Save</button>${!isNew?`<button class="danger" id="dpDlBtn">Delete</button>`:""}<button class="ghost" id="dpClBtn">Close</button>`;
+  bindSliders(body);
+  document.getElementById("dpXBtn").onclick=closeDPModal;
+  document.getElementById("dpClBtn").onclick=closeDPModal;
+  document.getElementById("dpSvBtn").onclick=()=>{
+    const o={domain:gv("domain",body),name:gv("name",body),owner:gv("owner",body),status:gv("status",body),horizon:gv("horizon",body),q:+gv("q",body),cons:+gv("cons",body),sla:!!body.querySelector("[data-k=sla]")?.checked,notas:gv("notas",body)};
     if(isNew){dp.push({id:"dp"+Date.now(),...o});toast("Added");}else{Object.assign(dp.find(x=>x.id===id),o);toast("Saved");}
-    save();renderDados();closePanel();
+    save();renderDados();closeDPModal();
   };
-  if(!isNew)document.getElementById("dlBtn").onclick=()=>{if(confirm("Delete?")){{dp=dp.filter(x=>x.id!==id);save();renderDados();closePanel();toast("Deleted");}}};
-  openPanel();
+  if(!isNew)document.getElementById("dpDlBtn").onclick=()=>{if(confirm("Delete?")){dp=dp.filter(x=>x.id!==id);save();renderDados();closeDPModal();toast("Deleted");}};
+  openDPModal();
 }
 function openGov(i){
   const g=governance[i];editCtx={type:"gov",i};
@@ -2078,11 +2181,15 @@ document.getElementById("addBtn").onclick=()=>{
 };
 document.getElementById("xBtn").onclick=closePanel;
 scrim.onclick=closePanel;
-document.addEventListener("keydown",e=>{if(e.key==="Escape")closePanel();});
+document.addEventListener("keydown",e=>{if(e.key==="Escape"){closePanel();closeDPModal();}});
 document.getElementById("view-horizontes").addEventListener("click",e=>{const b=e.target.closest(".bet");if(b)openBet(b.dataset.bid);const c=e.target.closest(".chip");if(c&&c.dataset.bf!==undefined){betFilter=c.dataset.bf||null;renderHorizontes();}});
 document.getElementById("view-dados").addEventListener("click",e=>{const r=e.target.closest(".dp-row");if(r)openDP(r.dataset.dp);});
 document.getElementById("view-portfolio").addEventListener("click",e=>{
   if(e.target.closest("#gantt-toggle")){toggleGantt();return;}
+  const gst=e.target.closest("[data-gst]");
+  if(gst){const v=gst.dataset.gst;if(!v)ganttStatusFilter.clear();else ganttStatusFilter.has(v)?ganttStatusFilter.delete(v):ganttStatusFilter.add(v);renderGanttPortfolio();return;}
+  const gpl=e.target.closest("[data-gpl]");
+  if(gpl){const v=gpl.dataset.gpl;if(!v)ganttPillarFilter.clear();else ganttPillarFilter.has(v)?ganttPillarFilter.delete(v):ganttPillarFilter.add(v);renderGanttPortfolio();return;}
   const c=e.target.closest(".p-card,.g-bar,.g-label");
   if(c&&c.dataset.pid)openProject(c.dataset.pid);
 });
