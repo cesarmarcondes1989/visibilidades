@@ -221,6 +221,30 @@ button:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
 .roi.neg{color:var(--re);font-weight:700;font-family:'IBM Plex Mono',monospace;font-size:12px}
 .roi.neu{color:var(--faint);font-family:'IBM Plex Mono',monospace;font-size:12px}
 
+/* ── GANTT (Portfolio) ───────────────────────────── */
+.gantt-card{border:1px solid var(--border);border-radius:14px;background:var(--s2);margin-bottom:22px;overflow:hidden}
+.gantt-head{display:flex;align-items:center;gap:10px;padding:13px 18px;cursor:pointer;user-select:none}
+.gantt-chevron{font-size:11px;color:var(--muted);transition:transform .15s;display:inline-block}
+.gantt-chevron.closed{transform:rotate(-90deg)}
+.gantt-title{font-size:13.5px;font-weight:700}
+.gantt-sub{font-size:11.5px;color:var(--faint);margin-left:auto}
+.gantt-body{padding:8px 18px 18px;border-top:1px solid var(--border);overflow-x:auto}
+.gantt-body.collapsed{display:none}
+.gantt-grid{position:relative;min-width:680px}
+.g-row{display:grid;grid-template-columns:200px 1fr;align-items:center}
+.g-group-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;display:flex;align-items:center;gap:7px;padding:14px 0 6px}
+.g-dot{width:8px;height:8px;border-radius:50%;flex:none;display:inline-block}
+.g-label{font-size:12px;font-weight:500;padding:6px 14px 6px 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;background:none;border:none;text-align:left;color:var(--text)}
+.g-label:hover{color:var(--acc)}
+.g-track{position:relative;height:30px;border-bottom:1px solid var(--border)}
+.g-head .g-track{height:24px;border-bottom:1px solid var(--border2)}
+.g-tick{position:absolute;top:0;bottom:0;font-size:10px;color:var(--faint);border-left:1px dashed var(--border);padding-left:5px;font-family:'IBM Plex Mono',monospace;white-space:nowrap}
+.g-bar{position:absolute;top:5px;height:20px;border:none;border-radius:6px;cursor:pointer;display:flex;align-items:center;overflow:hidden;padding:0;min-width:10px}
+.g-bar:hover{filter:brightness(.96);transform:translateY(-1px)}
+.g-bar-fill{position:absolute;left:0;top:0;bottom:0}
+.g-bar-text{position:relative;font-size:10px;font-weight:700;color:#fff;padding:0 7px;white-space:nowrap;font-family:'IBM Plex Mono',monospace;text-shadow:0 1px 1px rgba(0,0,0,.25)}
+.g-today{position:absolute;top:0;bottom:0;width:2px;background:var(--re);opacity:.55;z-index:2}
+
 /* ── MELHORIAS / SF ──────────────────────────────── */
 .seg-note{display:flex;gap:11px;align-items:center;font-size:13px;color:var(--muted);background:#EFF6FF;border:1px solid #BFDBFE;border-radius:12px;padding:13px 16px;margin-bottom:18px;flex-wrap:wrap}
 .seg-note b{color:var(--text)}
@@ -419,6 +443,14 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
   <div class="card card-p" style="margin-top:16px">
     <div class="card-head"><h2><span class="card-icon" style="background:#EFF6FF">📋</span>Projects Linked to Strategy</h2><div class="sub">each project maps to a horizon and a bet</div></div>
     <div class="kpis" id="kpi-portfolio"></div>
+    <div class="gantt-card" id="gantt-card">
+      <div class="gantt-head" id="gantt-toggle">
+        <span class="gantt-chevron" id="gantt-chevron">▾</span>
+        <span class="gantt-title">📅 Gantt — All Projects</span>
+        <span class="gantt-sub">click a bar or a name to open the project</span>
+      </div>
+      <div class="gantt-body" id="gantt-body"><div id="gantt-chart"></div></div>
+    </div>
     <div id="portfolio-board"></div>
   </div>
 </div>
@@ -679,12 +711,12 @@ const DEFAULT_EDGES = [
 ];
 
 const DEFAULT_PROJECTS = [
-  {id:"proj1",hz:"h1",pillar:"mro",bet:"b1",name:"Beacon Expansion v3",descr:"Onboarding 20 operators, mobile module, AOG integration.",inv:2500000,rec:6000000,prog:65,status:"Active"},
-  {id:"proj2",hz:"h1",pillar:"dados",bet:"b2",name:"Lakehouse v2",descr:"Unified data lake, ERP/PLM/Beacon pipelines, initial catalog.",inv:3200000,rec:0,prog:30,status:"Active"},
-  {id:"proj3",hz:"h1",pillar:"mat",bet:"b3",name:"Parts e-commerce + Digital pool",descr:"Digital parts purchasing channel and pool management.",inv:900000,rec:2700000,prog:100,status:"Done"},
-  {id:"proj4",hz:"h2",pillar:"saude",bet:"b4",name:"AHEAD Phase 2 — predictive at scale",descr:"Integrated telemetry, new prognostic models, fleet dashboard.",inv:1800000,rec:4200000,prog:40,status:"Bet"},
-  {id:"proj5",hz:"h2",pillar:"ia",bet:"b6",name:"GenAI Co-pilot for Technicians",descr:"AI assistant with RAG over technical documentation and failure history.",inv:400000,rec:1500000,prog:10,status:"Bet"},
-  {id:"proj6",hz:"h2",pillar:"mro",bet:"b7",name:"SF Customer 360",descr:"Unified operator view in Salesforce with fleet history.",inv:600000,rec:1800000,prog:50,status:"Active"}
+  {id:"proj1",hz:"h1",pillar:"mro",bet:"b1",name:"Beacon Expansion v3",descr:"Onboarding 20 operators, mobile module, AOG integration.",inv:2500000,rec:6000000,prog:65,status:"Active",start:"2025-11-01",end:"2026-08-31"},
+  {id:"proj2",hz:"h1",pillar:"dados",bet:"b2",name:"Lakehouse v2",descr:"Unified data lake, ERP/PLM/Beacon pipelines, initial catalog.",inv:3200000,rec:0,prog:30,status:"Active",start:"2026-02-01",end:"2026-12-31"},
+  {id:"proj3",hz:"h1",pillar:"mat",bet:"b3",name:"Parts e-commerce + Digital pool",descr:"Digital parts purchasing channel and pool management.",inv:900000,rec:2700000,prog:100,status:"Done",start:"2025-03-01",end:"2025-10-31"},
+  {id:"proj4",hz:"h2",pillar:"saude",bet:"b4",name:"AHEAD Phase 2 — predictive at scale",descr:"Integrated telemetry, new prognostic models, fleet dashboard.",inv:1800000,rec:4200000,prog:40,status:"Bet",start:"2026-01-01",end:"2027-06-30"},
+  {id:"proj5",hz:"h2",pillar:"ia",bet:"b6",name:"GenAI Co-pilot for Technicians",descr:"AI assistant with RAG over technical documentation and failure history.",inv:400000,rec:1500000,prog:10,status:"Bet",start:"2026-05-01",end:"2027-02-28"},
+  {id:"proj6",hz:"h2",pillar:"mro",bet:"b7",name:"SF Customer 360",descr:"Unified operator view in Salesforce with fleet history.",inv:600000,rec:1800000,prog:50,status:"Active",start:"2025-10-01",end:"2026-09-30"}
 ];
 
 const DEFAULT_MEL = [
@@ -700,7 +732,7 @@ const DEFAULT_MEL = [
 let vision={}, bets=[], dp=[], maturity=[], governance=[], gNodes=[], gEdges=[];
 let projects=[], mel=[], dataVision={}, principles=[];
 let budget=[], fup=[];
-let betFilter=null, graphFilter=null, currentTab="visao", graph=null;
+let betFilter=null, graphFilter=null, currentTab="visao", graph=null, _ganttOpen=true;
 let editCtx=null;
 
 // ══ PERSISTÊNCIA · File System Access API + SheetJS (embutido) ════════
@@ -772,7 +804,7 @@ const SH={
   data_products:["id","domain","name","owner","q","cons","status","horizon","sla","notas"],
   maturity:     ["id","name","atual","alvo","owner"],
   governance:   ["name","atual","alvo","owner","note"],
-  projects:     ["id","hz","pillar","bet","name","descr","inv","rec","prog","status"],
+  projects:     ["id","hz","pillar","bet","name","descr","inv","rec","prog","status","start","end"],
   melhorias:    ["id","area","name","status","inv","rec","prog","notas"],
   graph_nodes:  ["id","type","label","group"],
   graph_edges:  ["from","to","intensity","label"],
@@ -1208,6 +1240,80 @@ function initGraph(){
   graph=new ForceGraph(canvas,visNodes,visEdges);
 }
 
+// ══ GANTT (Portfolio) ════════════════════════════════════════════════
+const GANTT_LABEL_W=200;
+function _pdate(s){const d=s?new Date(s):null;return d&&!isNaN(d)?d:null;}
+function projRange(p){
+  let s=_pdate(p.start),e=_pdate(p.end);
+  if(!s&&!e){s=new Date();e=new Date();e.setMonth(e.getMonth()+3);}
+  else if(s&&!e){e=new Date(s);e.setMonth(e.getMonth()+3);}
+  else if(!s&&e){s=new Date(e);s.setMonth(s.getMonth()-3);}
+  if(e<s){const t=s;s=e;e=t;}
+  return {s,e};
+}
+function toggleGantt(){
+  _ganttOpen=!_ganttOpen;
+  document.getElementById("gantt-body").classList.toggle("collapsed",!_ganttOpen);
+  document.getElementById("gantt-chevron").classList.toggle("closed",!_ganttOpen);
+}
+function renderGanttPortfolio(){
+  const box=document.getElementById("gantt-chart");
+  if(!projects.length){
+    box.innerHTML=`<div style="text-align:center;padding:30px;color:var(--muted);font-size:13px">Nenhum projeto cadastrado.</div>`;
+    return;
+  }
+  const ranges=projects.map(p=>({p,...projRange(p)}));
+  let minD=new Date(Math.min(...ranges.map(r=>+r.s)));
+  let maxD=new Date(Math.max(...ranges.map(r=>+r.e)));
+  minD=new Date(minD.getFullYear(),minD.getMonth(),1);
+  maxD=new Date(maxD.getFullYear(),maxD.getMonth()+1,0);
+  const totalMs=maxD-minD||1;
+  const pct=d=>Math.max(0,Math.min(100,(d-minD)/totalMs*100));
+  const spanMonths=(maxD.getFullYear()-minD.getFullYear())*12+(maxD.getMonth()-minD.getMonth())+1;
+  const step=spanMonths<=8?1:spanMonths<=18?2:spanMonths<=36?3:6;
+  const ticks=[];
+  for(let i=0;;i++){
+    const cur=new Date(minD.getFullYear(),minD.getMonth()+i*step,1);
+    if(cur>maxD)break;
+    ticks.push(cur);
+  }
+  const today=new Date();
+  const todayPct=(today>=minD&&today<=maxD)?pct(today):null;
+  const fmtTick=t=>t.getMonth()===0
+    ?t.toLocaleDateString("pt-BR",{month:"short"})+" '"+String(t.getFullYear()).slice(-2)
+    :t.toLocaleDateString("pt-BR",{month:"short"});
+  const gridMinW=Math.max(680,GANTT_LABEL_W+ticks.length*70);
+
+  const head=`<div class="g-row g-head">
+    <div class="g-label"></div>
+    <div class="g-track">${ticks.map(t=>`<div class="g-tick" style="left:${pct(t).toFixed(3)}%">${fmtTick(t)}</div>`).join("")}</div>
+  </div>`;
+
+  const rows=HZ.map(h=>{
+    const hp=ranges.filter(r=>r.p.hz===h.id);
+    if(!hp.length)return "";
+    const groupHead=`<div class="g-group-label" style="color:${h.color}"><span class="g-dot" style="background:${h.color}"></span>${h.name}</div>`;
+    const body=hp.map(r=>{
+      const p=r.p,sc=STATUS_COLORS[p.status]||"#94A3B8";
+      const left=pct(r.s),width=Math.max(1.5,pct(r.e)-left);
+      const prog=Math.min(100,+p.prog||0);
+      return `<div class="g-row">
+        <button class="g-label" data-pid="${p.id}" title="${p.name}">${p.name}</button>
+        <div class="g-track">
+          <button class="g-bar" data-pid="${p.id}" style="left:${left.toFixed(3)}%;width:${width.toFixed(3)}%;background:${sc}55" title="${p.name} — ${p.status} — ${prog}%">
+            <span class="g-bar-fill" style="width:${prog}%;background:${sc}"></span>
+            <span class="g-bar-text">${prog}%</span>
+          </button>
+        </div>
+      </div>`;
+    }).join("");
+    return groupHead+body;
+  }).join("");
+
+  const todayLine=todayPct!=null?`<div class="g-today" style="left:calc(${GANTT_LABEL_W}px + (100% - ${GANTT_LABEL_W}px) * ${(todayPct/100).toFixed(4)})" title="Hoje"></div>`:"";
+  box.innerHTML=`<div class="gantt-grid" style="min-width:${gridMinW}px">${head}${rows}${todayLine}</div>`;
+}
+
 // ══ RENDER PORTFOLIO ═════════════════════════════════════════════════
 function renderPortfolio(){
   const tot=projects.reduce((s,p)=>s+(+p.inv||0),0);
@@ -1218,6 +1324,7 @@ function renderPortfolio(){
     kpi("Expected Return",fmtBRL(gan),"projected revenue + gain","gr")+
     kpi("Portfolio ROI",rc.t,"on total invested","")+
     kpi("Active Projects",projects.filter(p=>p.status==="Active"||p.status==="Bet").length,"in progress","");
+  renderGanttPortfolio();
   const board=document.getElementById("portfolio-board");
   board.innerHTML=HZ.map(h=>{
     const ps=projects.filter(p=>p.hz===h.id);if(!ps.length)return "";
@@ -1913,12 +2020,13 @@ function openProject(id){
     sel("Pillar","pillar",p.pillar||"mro",pillars.map(x=>({v:x.id,t:x.name})))+
     sel("Linked bet","bet",p.bet||"",bets.map(b=>({v:b.id,t:b.name})))+
     fld("Project name","name",p.name)+ta("Description","descr",p.descr)+
+    fld("Start date","start",p.start,"date")+fld("End date","end",p.end,"date")+
     fld("Investment (R$)","inv",p.inv||0,"number")+fld("Expected Return (R$)","rec",p.rec||0,"number")+
     sldr("Progress (%)","prog",p.prog||0,0,100)+sel("Status","status",p.status||"Exploração",STLIST);
   document.getElementById("panelFoot").innerHTML=`<button class="primary" id="svBtn">Save</button>${!isNew?`<button class="danger" id="dlBtn">Delete</button>`:""}`;
   bindSliders();
   document.getElementById("svBtn").onclick=()=>{
-    const d={hz:gv("hz"),pillar:gv("pillar"),bet:gv("bet"),name:gv("name"),descr:gv("descr"),inv:+gv("inv"),rec:+gv("rec"),prog:+gv("prog"),status:gv("status")};
+    const d={hz:gv("hz"),pillar:gv("pillar"),bet:gv("bet"),name:gv("name"),descr:gv("descr"),start:gv("start"),end:gv("end"),inv:+gv("inv"),rec:+gv("rec"),prog:+gv("prog"),status:gv("status")};
     if(isNew){projects.push({id:"proj"+Date.now(),...d});toast("Project added");}else{Object.assign(projects.find(x=>x.id===id),d);toast("Saved");}
     save();renderPortfolio();closePanel();
   };
@@ -1973,7 +2081,11 @@ scrim.onclick=closePanel;
 document.addEventListener("keydown",e=>{if(e.key==="Escape")closePanel();});
 document.getElementById("view-horizontes").addEventListener("click",e=>{const b=e.target.closest(".bet");if(b)openBet(b.dataset.bid);const c=e.target.closest(".chip");if(c&&c.dataset.bf!==undefined){betFilter=c.dataset.bf||null;renderHorizontes();}});
 document.getElementById("view-dados").addEventListener("click",e=>{const r=e.target.closest(".dp-row");if(r)openDP(r.dataset.dp);});
-document.getElementById("view-portfolio").addEventListener("click",e=>{const c=e.target.closest(".p-card");if(c)openProject(c.dataset.pid);});
+document.getElementById("view-portfolio").addEventListener("click",e=>{
+  if(e.target.closest("#gantt-toggle")){toggleGantt();return;}
+  const c=e.target.closest(".p-card,.g-bar,.g-label");
+  if(c&&c.dataset.pid)openProject(c.dataset.pid);
+});
 document.getElementById("view-melhorias").addEventListener("click",e=>{const c=e.target.closest(".ms-item");if(c)openMel(c.dataset.mid);});
 document.getElementById("view-budget").addEventListener("click",e=>{const c=e.target.closest(".budget-row");if(c)openBudget(c.dataset.bid);});
 document.getElementById("view-fup").addEventListener("click",e=>{const c=e.target.closest(".fup-card");if(c)openFup(c.dataset.fid);});
