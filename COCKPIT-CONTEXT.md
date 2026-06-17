@@ -88,6 +88,7 @@ let currentTab   = "visao";
 let graph        = null;  // instância ForceGraph
 let _fh          = null;  // FileSystemFileHandle
 let _fupTab      = "acomp"; // sub-tab ativo no FUP
+let _ganttOpen   = true;  // estado expandido/recolhido do Gantt no Portfolio
 ```
 
 ---
@@ -104,7 +105,7 @@ let _fupTab      = "acomp"; // sub-tab ativo no FUP
 | `data_products` | Data products | `id`, `domain`, `name`, `owner`, `q`, `cons`, `status`, `horizon`, `sla`, `notas` |
 | `maturity` | Governance maturity | `id`, `name`, `atual`, `alvo`, `owner` |
 | `governance` | Governance capabilities | `name`, `atual`, `alvo`, `owner`, `note` |
-| `projects` | Portfolio projects | `id`, `hz`, `pillar`, `bet`, `name`, `descr`, `inv`, `rec`, `prog`, `status` |
+| `projects` | Portfolio projects | `id`, `hz`, `pillar`, `bet`, `name`, `descr`, `inv`, `rec`, `prog`, `status`, `start`, `end` |
 | `melhorias` | Improvements & SF | `id`, `area`, `name`, `status`, `inv`, `rec`, `prog`, `notas` |
 | `graph_nodes` | Graph nodes (só não-projeto) | `id`, `type`, `label`, `group`, `x`, `y` |
 | `graph_edges` | Graph edges | `from`, `to`, `intensity`, `label` |
@@ -168,7 +169,11 @@ Qualquer edição → save() → debounce 700ms → _write()
 | `renderHorizontes()` | Aba Horizons |
 | `renderDados()` | Aba Data Strategy |
 | `renderGrafo()` | Aba Graph |
-| `renderPortfolio()` | Aba Portfolio |
+| `renderPortfolio()` | Aba Portfolio (KPIs + Gantt + kanban por horizonte) |
+| `renderGanttPortfolio()` | Desenha o Gantt de todos os projetos (agrupado por horizonte, com linha de "hoje") dentro de `#gantt-chart` |
+| `toggleGantt()` | Expande/recolhe a seção do Gantt (`_ganttOpen`), sem afetar o estado persistido |
+| `projRange(p)` | Resolve `{s,e}` (Date) efetivos de um projeto a partir de `p.start`/`p.end`, com fallback de ~3 meses quando faltam datas |
+| `_pdate(s)` | Helper: converte string em `Date` válido ou `null` |
 | `renderMelhorias()` | Aba Improvements & SF |
 | `renderBudget()` | Aba Budget — KPIs + tabela por categoria com `<meter>` |
 | `renderFup()` | Aba FUP — kanban Acompanhamento + lista Informativo |
@@ -210,6 +215,9 @@ Tanto `openAddEdgePanel()` quanto `openAddEdgePanelGlobal()` usam um sistema de 
 
 ### Budget — barra de execução
 Usa `<meter>` HTML nativo (não `<div>`) com CSS customizado via `::-webkit-meter-*` para manter o visual consistente com o design system. Cores automáticas por threshold via atributos `low`, `high`, `optimum`. Parsing numérico defensivo via `parseFloat(String(v).replace(/[^0-9.]/g,""))` para lidar com valores do SheetJS que podem chegar como string.
+
+### Portfolio — Gantt de todos os projetos
+A aba Portfolio tem uma seção de Gantt (`renderGanttPortfolio()`) acima do board de cards, agrupada por horizonte (Now/Scale/Differentiation), com linha vertical de "hoje" e ticks de tempo adaptativos (mensal, bimestral, trimestral ou semestral conforme o intervalo total). É recolhível via `toggleGantt()` (estado `_ganttOpen`, não persistido). Clicar numa barra ou no nome do projeto (`.g-bar`/`.g-label`) abre o mesmo painel de edição (`openProject`) usado pelos cards — não há uma visão separada "somente leitura". Projetos sem `start`/`end` cadastrados recebem um intervalo padrão de ~3 meses (`projRange()`) só para exibição; os campos no Excel continuam vazios até o usuário editar.
 
 ### FUP — dois tipos
 - **`tipo: "acomp"`** — atividades de acompanhamento com Título, Responsável, Prazo, Prioridade, Status, checkbox "👁 Acompanhar". Renderizado em kanban por status.
