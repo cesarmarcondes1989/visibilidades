@@ -7,7 +7,7 @@
 
 Um **arquivo HTML único** (~764 KB) que funciona como cockpit digital de estratégia para o Head of Digital Solutions & Services de uma fabricante de aeronaves (contexto Embraer). Sem servidor, sem instalação — abre direto no Chrome/Edge 86+.
 
-**Nome do arquivo:** `COCKPIT-ABRIR-AQUI20.html` (arquivo canônico atual; versões anteriores ficam no repo só por histórico — baixe sempre o número mais alto)
+**Nome do arquivo:** `COCKPIT-ABRIR-AQUI21.html` (arquivo canônico atual; versões anteriores ficam no repo só por histórico — baixe sempre o número mais alto)
 **Tech stack:** Vanilla HTML + CSS + JavaScript, SheetJS (embedded, ~624 KB), File System Access API, IndexedDB
 **Persistência:** Lê/escreve um arquivo `.xlsx` local via File System Access API do browser. Sem backend.
 **Primeiro uso:** Cria o Excel com dados seed automaticamente.
@@ -111,7 +111,7 @@ let _dpSubEdit   = null;  // null | "new" | id do subprojeto em edição no moda
 | `principles` | Data principles | `icon`, `name`, `desc` |
 | `bets` | Strategic bets | `id`, `hz`, `pillar`, `name`, `intent`, `porque`, `enablerDados`, `enablerTech`, `metrica`, `meta`, `atual`, `status` |
 | `data_products` | Data products | `id`, `domain`, `name`, `owner`, `q`, `cons`, `status`, `horizon`, `sla`, `notas` |
-| `dp_subs` | Subprojetos de cada data product | `id`, `dpId`, `name`, `status`, `prog`, `start`, `end` |
+| `dp_subs` | Subprojetos de cada data product | `id`, `dpId`, `name`, `descr`, `status`, `prog`, `start`, `end` |
 | `maturity` | Governance maturity | `id`, `name`, `atual`, `alvo`, `owner` |
 | `governance` | Governance capabilities | `name`, `atual`, `alvo`, `owner`, `note` |
 | `projects` | Portfolio projects | `id`, `hz`, `pillar`, `bet`, `name`, `descr`, `inv`, `rec`, `prog`, `status`, `start`, `end` |
@@ -222,6 +222,8 @@ Qualquer edição → save() → debounce 700ms → _write()
 ### Graph — herança de projetos
 Nós do tipo `"projeto"` no grafo são **derivados automaticamente** do array `projects` — não são armazenados separadamente. A função `getEffectiveGraphNodes()` combina nós não-projeto do `gNodes` com nós gerados dinamicamente de `projects` (ID: `"pj-" + project.id`). Posições x/y de nós de projeto são salvas em `gNodes` quando o usuário arrasta o nó.
 
+**Importante:** qualquer código que precise exibir o `label`/`type` de um nó (incluindo nós de projeto) deve resolver via `getEffectiveGraphNodes().find(...)`, nunca via `gNodes.find(...)` diretamente — `gNodes` só contém o cache de posição (`x`/`y`) de nós de projeto já arrastados, sem `label`. Usar `gNodes.find` para resolver o nome de um nó de projeto falha silenciosamente (retorna `undefined`) e expõe o ID bruto (`pj-...`) na UI. `openNodePanel()` (lista de Conexões) e `_delEdge()` (lookup de `backToId`) foram corrigidos para usar `getEffectiveGraphNodes()`, no mesmo padrão já usado por `openAddEdgePanel()`/`openAddEdgePanelGlobal()`.
+
 ### Graph — Adicionar Conexões (multi-add)
 Tanto `openAddEdgePanel()` quanto `openAddEdgePanelGlobal()` usam um sistema de **staging**: o usuário clica `+ Adicionar` várias vezes acumulando conexões numa lista visível, podendo remover com `×`, e só ao clicar `Salvar N conexões` tudo é persistido de uma vez.
 
@@ -248,7 +250,7 @@ Fecha com o botão "✕", o botão "Close", clique fora do card (no scrim) ou Es
 
 ### Data Strategy — Subprojetos do Data Product
 Dentro do modal do Data Product, abaixo do checkbox de SLA, há uma seção "Subprojetos" (`#dpSubsArea`, desenhada por `renderDPSubsArea(dpId)`) que permite quebrar o produto em itens menores e acompanhar o que está sendo implementado — mesma proposta do Gantt do Portfolio, só que individualizada por produto:
-- Armazenados em `dpSubs` (`{id, dpId, name, status, prog, start, end}`), persistidos na sheet `dp_subs` com FK `dpId`. Reusam o vocabulário de status `STLIST` (Active/Bet/Exploration/Done/Paused/At Risk) e a mesma lógica de fallback de datas `projRange()` usada pelos projetos do Portfolio.
+- Armazenados em `dpSubs` (`{id, dpId, name, descr, status, prog, start, end}`), persistidos na sheet `dp_subs` com FK `dpId`. `descr` é um campo de texto livre (textarea `ta("Descrição","sb_descr",s.descr)`) para detalhar o subprojeto. Reusam o vocabulário de status `STLIST` (Active/Bet/Exploration/Done/Paused/At Risk) e a mesma lógica de fallback de datas `projRange()` usada pelos projetos do Portfolio.
 - Se já existem subprojetos, são desenhados como um mini-Gantt via `buildGanttGrid(items, {dataAttr:"sid"})` (sem agrupamento por horizonte). Clicar numa barra/label (`[data-sid]`) abre o formulário inline de edição daquele subprojeto.
 - O botão "+ Subprojeto" (`#dpSubAddBtn`) seta `_dpSubEdit="new"` e mostra o formulário inline (`.dp-subform`) com nome, status, progresso (slider) e datas de início/fim — sem abrir um segundo modal sobreposto.
 - Salvar/excluir um subprojeto chama `save()` imediatamente (não depende do botão "Save" do produto). `_dpSubEdit` é resetado ao salvar, cancelar, fechar o modal (`closeDPModal()`) ou ao trocar de subprojeto.
