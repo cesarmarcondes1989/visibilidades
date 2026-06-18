@@ -7,11 +7,13 @@
 
 Um **arquivo HTML único** (~764 KB) que funciona como cockpit digital de estratégia para o Head of Digital Solutions & Services de uma fabricante de aeronaves (contexto Embraer). Sem servidor, sem instalação — abre direto no Chrome/Edge 86+.
 
-**Nome do arquivo:** `COCKPIT-ABRIR-AQUI20.html` (arquivo canônico atual; `COCKPIT-ABRIR-AQUI19.html` é a versão anterior, mantida no repo só por histórico — baixe sempre o número mais alto)
+**Nome do arquivo:** `COCKPIT-ABRIR-AQUI20.html` (arquivo canônico atual; versões anteriores ficam no repo só por histórico — baixe sempre o número mais alto)
 **Tech stack:** Vanilla HTML + CSS + JavaScript, SheetJS (embedded, ~624 KB), File System Access API, IndexedDB
 **Persistência:** Lê/escreve um arquivo `.xlsx` local via File System Access API do browser. Sem backend.
 **Primeiro uso:** Cria o Excel com dados seed automaticamente.
 **Usos seguintes:** Browser pede permissão para re-acessar o arquivo (comportamento normal do Chrome/Edge por sessão).
+
+> **Convenção obrigatória de versionamento:** o usuário baixa o HTML do GitHub e abre localmente — não há deploy/refresh automático. Por isso, **toda alteração no app gera um arquivo novo com o número incrementado** (ex.: próxima mudança após `AQUI20.html` cria `AQUI21.html`), nunca editando o arquivo canônico anterior em-place. Atualizar este documento (nome do arquivo + link) e o `<title>`/referências internas se houver. Os arquivos antigos permanecem no repo como histórico.
 
 ---
 
