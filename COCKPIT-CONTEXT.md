@@ -7,7 +7,7 @@
 
 Um **arquivo HTML único** (~764 KB) que funciona como cockpit digital de estratégia para o Head of Digital Solutions & Services de uma fabricante de aeronaves (contexto Embraer). Sem servidor, sem instalação — abre direto no Chrome/Edge 86+.
 
-**Nome do arquivo:** `COCKPIT-ABRIR-AQUI21.html` (arquivo canônico atual; versões anteriores ficam no repo só por histórico — baixe sempre o número mais alto)
+**Nome do arquivo:** `COCKPIT-ABRIR-AQUI22.html` (arquivo canônico atual; versões anteriores ficam no repo só por histórico — baixe sempre o número mais alto)
 **Tech stack:** Vanilla HTML + CSS + JavaScript, SheetJS (embedded, ~624 KB), File System Access API, IndexedDB
 **Persistência:** Lê/escreve um arquivo `.xlsx` local via File System Access API do browser. Sem backend.
 **Primeiro uso:** Cria o Excel com dados seed automaticamente.
@@ -45,6 +45,7 @@ estrategia.xlsx            (banco de dados do usuário — Excel local)
 | `dados` | Data Strategy | `view-dados` |
 | `grafo` | Graph | `view-grafo` |
 | `portfolio` | Portfolio | `view-portfolio` |
+| `people` | 👥 People | `view-people` |
 | `melhorias` | Improvements & SF | `view-melhorias` |
 | `budget` | 💰 Budget | `view-budget` |
 | `fup` | 📋 FUP | `view-fup` |
@@ -55,6 +56,7 @@ estrategia.xlsx            (banco de dados do usuário — Excel local)
 - Horizons → `+ Bet`
 - Data Strategy → `+ Data Product`
 - Portfolio → `+ Project`
+- People → `+ Pessoa`
 - Improvements → `+ Initiative`
 - Budget → `+ Item`
 - FUP → `+ Atividade`
@@ -83,12 +85,16 @@ let pillars      = [];    // strategic pillars (editável via Admin)
 let domains      = [];    // data domains (editável via Admin)
 let budget       = [];    // itens de custo (Budget tab)
 let fup          = [];    // atividades de acompanhamento e informativos (FUP tab)
+let people       = [];    // pessoas (People tab) — {id, name, cargo}
+let peopleSkills = [];    // skills de cada pessoa (fk personId), uma linha por skill
+let peopleAch    = [];    // achievements de cada pessoa (fk personId) — {id, personId, title, descr, date}
 
 // Runtime only (não persistido)
 let betFilter    = null;
 let graphFilter  = null;
 let currentTab   = "visao";
-let graph        = null;  // instância ForceGraph
+let graph        = null;  // instância ForceGraph (aba Graph)
+let peopleGraph  = null;  // instância ForceGraph dedicada (aba People — só nós pessoa/projeto)
 let _fh          = null;  // FileSystemFileHandle
 let _fupTab      = "acomp"; // sub-tab ativo no FUP
 let _ganttOpen   = true;  // estado expandido/recolhido do Gantt no Portfolio
@@ -97,6 +103,7 @@ let ganttDateTo   = null; // idem, data final
 let ganttStatusFilter = new Set(); // filtro multi-seleção por status do Gantt, não persistido (vazio = todos)
 let ganttPillarFilter = new Set(); // filtro multi-seleção por pilar do Gantt, não persistido (vazio = todos)
 let _dpSubEdit   = null;  // null | "new" | id do subprojeto em edição no modal de Data Product, não persistido
+let _personAchEdit = null; // null | "new" | id do achievement em edição no modal de Pessoa, não persistido
 ```
 
 ---
@@ -116,12 +123,15 @@ let _dpSubEdit   = null;  // null | "new" | id do subprojeto em edição no moda
 | `governance` | Governance capabilities | `name`, `atual`, `alvo`, `owner`, `note` |
 | `projects` | Portfolio projects | `id`, `hz`, `pillar`, `bet`, `name`, `descr`, `inv`, `rec`, `prog`, `status`, `start`, `end` |
 | `melhorias` | Improvements & SF | `id`, `area`, `name`, `status`, `inv`, `rec`, `prog`, `notas` |
-| `graph_nodes` | Graph nodes (só não-projeto) | `id`, `type`, `label`, `group`, `x`, `y` |
+| `graph_nodes` | Graph nodes (exceto projeto/pessoa, que são derivados) | `id`, `type`, `label`, `group`, `x`, `y` |
 | `graph_edges` | Graph edges | `from`, `to`, `intensity`, `label` |
 | `pillars` | Pillars editáveis | `id`, `name`, `color` |
 | `domains` | Domains editáveis | `id`, `name`, `color` |
 | `budget` | Itens de custo | `id`, `name`, `categoria`, `anual`, `ytd`, `notas` |
 | `fup` | Atividades FUP | `id`, `tipo`, `titulo`, `responsavel`, `prazo`, `prioridade`, `status`, `acompanhar`, `notas` |
+| `people` | Pessoas | `id`, `name`, `cargo` |
+| `people_skills` | Skills de cada pessoa (fk `personId`) | `id`, `personId`, `skill` |
+| `people_achievements` | Achievements de cada pessoa (fk `personId`) | `id`, `personId`, `title`, `descr`, `date` |
 
 ---
 
@@ -190,8 +200,13 @@ Qualquer edição → save() → debounce 700ms → _write()
 | `renderBudget()` | Aba Budget — KPIs + tabela por categoria com `<meter>` |
 | `renderFup()` | Aba FUP — kanban Acompanhamento + lista Informativo |
 | `renderAdmin()` | Aba Admin |
+| `renderPeople()` | Aba People — KPIs + board de cards (`personCard`) + chama `renderPeopleGraphView()` |
+| `personCard(p)` | HTML de um card de pessoa (nome, cargo, até 4 badges de skill +N, contagem de achievements/conexões) |
+| `renderPeopleGraphView()` | Desenha a legenda (`#peopleGraphLegend`, só Pessoa+Projeto) e chama `initPeopleGraph()` |
+| `initPeopleGraph()` | Cria `peopleGraph` (instância `ForceGraph` dedicada, filtrando `getEffectiveGraphNodes()` só para tipos `pessoa`/`projeto`) |
+| `refreshPeopleGraph()` | Destrói e recria `peopleGraph` (mirror de `_refreshGraph()`) |
 | `initGraph()` | Cria instância `ForceGraph` com nós filtrados |
-| `getEffectiveGraphNodes()` | Retorna nós não-projeto do `gNodes` + nós derivados de `projects` |
+| `getEffectiveGraphNodes()` | Retorna nós não-derivados do `gNodes` + nós derivados de `projects` (tipo `projeto`) + nós derivados de `people` (tipo `pessoa`) |
 | `switchTab(t)` | Troca a aba ativa |
 | `switchFupTab(t)` | Troca sub-tab do FUP (acomp/info) |
 
@@ -210,22 +225,28 @@ Qualquer edição → save() → debounce 700ms → _write()
 | `openPrinciplePanel(i)` | Data principle |
 | `openDiagPanel()` | Strategic diagnosis |
 | `openNodePanel(node)` | Graph node (null = novo) |
-| `openAddEdgePanel(fromId)` | Add edge a partir de nó específico (multi-add com staging) |
+| `openAddEdgePanel(fromId, personId?)` | Add edge a partir de nó específico (multi-add com staging). Se `personId` for passado, "Voltar" e o fim do save reabrem `openPerson(personId)` em vez do `openNodePanel`/`closePanel()` genérico |
 | `openAddEdgePanelGlobal()` | Add edge do zero (multi-add com staging) |
 | `openPillarPanel(id)` | Strategic pillar (null = novo) |
 | `openDomainPanel(id)` | Data domain (null = novo) |
+| `openPerson(id)` | Pessoa (null = novo) — **não usa o side panel**, abre o modal centralizado (`#dpModalWrap`/`openDPModal()`/`closeDPModal()`), o mesmo reusado pelo Data Product. Ver "People — Modal central da Pessoa" abaixo |
+| `renderPersonSkillsArea(personId)` | Desenha badges de skill com `×` de remover + input para adicionar uma skill por vez (Enter também submete) |
+| `window._delSkill(skillId, personId)` | Global (onclick inline) — remove uma skill e re-renderiza a área de skills + o board de pessoas |
+| `renderPersonAchArea(personId)` | Lista de achievements (clique para editar) + formulário inline de adicionar/editar (título/descrição/data), mesmo padrão do `renderDPSubsArea` |
+| `renderPersonConnArea(personId)` | Lista as conexões (`gEdges`) que tocam o nó `"pe-"+personId`, cada linha com slider de intensidade (`_updateEI`) e botão de remover (`_delPersonEdge`) |
+| `_delPersonEdge(from, to, personId)` | Remove uma conexão pessoa↔projeto e re-renderiza a área de conexões do modal (sem fechar o modal) |
 
 ---
 
 ## 8. Comportamentos Especiais
 
-### Graph — herança de projetos
-Nós do tipo `"projeto"` no grafo são **derivados automaticamente** do array `projects` — não são armazenados separadamente. A função `getEffectiveGraphNodes()` combina nós não-projeto do `gNodes` com nós gerados dinamicamente de `projects` (ID: `"pj-" + project.id`). Posições x/y de nós de projeto são salvas em `gNodes` quando o usuário arrasta o nó.
+### Graph — herança de projetos e pessoas
+Nós dos tipos `"projeto"` e `"pessoa"` no grafo são **derivados automaticamente** dos arrays `projects` e `people` — não são armazenados separadamente. A função `getEffectiveGraphNodes()` combina nós não-derivados do `gNodes` com nós gerados dinamicamente de `projects` (ID: `"pj-" + project.id`) e de `people` (ID: `"pe-" + person.id`). Posições x/y de nós derivados são salvas em `gNodes` como referência quando o usuário arrasta o nó (mesmo cache, mesma lógica em `ForceGraph.bindEvents()` para os dois tipos).
 
 **Importante:** qualquer código que precise exibir o `label`/`type` de um nó (incluindo nós de projeto) deve resolver via `getEffectiveGraphNodes().find(...)`, nunca via `gNodes.find(...)` diretamente — `gNodes` só contém o cache de posição (`x`/`y`) de nós de projeto já arrastados, sem `label`. Usar `gNodes.find` para resolver o nome de um nó de projeto falha silenciosamente (retorna `undefined`) e expõe o ID bruto (`pj-...`) na UI. `openNodePanel()` (lista de Conexões) e `_delEdge()` (lookup de `backToId`) foram corrigidos para usar `getEffectiveGraphNodes()`, no mesmo padrão já usado por `openAddEdgePanel()`/`openAddEdgePanelGlobal()`.
 
 ### Graph — Adicionar Conexões (multi-add)
-Tanto `openAddEdgePanel()` quanto `openAddEdgePanelGlobal()` usam um sistema de **staging**: o usuário clica `+ Adicionar` várias vezes acumulando conexões numa lista visível, podendo remover com `×`, e só ao clicar `Salvar N conexões` tudo é persistido de uma vez.
+Tanto `openAddEdgePanel(fromId, personId?)` quanto `openAddEdgePanelGlobal()` usam um sistema de **staging**: o usuário clica `+ Adicionar` várias vezes acumulando conexões numa lista visível, podendo remover com `×`, e só ao clicar `Salvar N conexões`/`Salvar N conexão` tudo é persistido de uma vez. O label do botão e o toast final pluralizam corretamente via ternário na palavra toda (`` `${n} ${n>1?"conexões":"conexão"}` ``) — **nunca** concatenar sufixo num plural irregular (ex.: `` `conexão${n>1?"ões":""}" `` produz "conexãoões", bug corrigido nesta versão nos dois pontos de `openAddEdgePanel` e no de `openAddEdgePanelGlobal`).
 
 ### Budget — barra de execução
 Usa `<meter>` HTML nativo (não `<div>`) com CSS customizado via `::-webkit-meter-*` para manter o visual consistente com o design system. Cores automáticas por threshold via atributos `low`, `high`, `optimum`. Parsing numérico defensivo via `parseFloat(String(v).replace(/[^0-9.]/g,""))` para lidar com valores do SheetJS que podem chegar como string.
@@ -256,6 +277,19 @@ Dentro do modal do Data Product, abaixo do checkbox de SLA, há uma seção "Sub
 - Salvar/excluir um subprojeto chama `save()` imediatamente (não depende do botão "Save" do produto). `_dpSubEdit` é resetado ao salvar, cancelar, fechar o modal (`closeDPModal()`) ou ao trocar de subprojeto.
 - Um Data Product **novo e ainda não salvo** não pode ter subprojetos — a área mostra "Salve o produto antes de adicionar subprojetos." e o botão "+ Subprojeto" não aparece (subprojetos dependem de um `dpId` já existente).
 - Excluir um Data Product remove em cascata todos os seus `dpSubs` (`dpSubs=dpSubs.filter(s=>s.dpId!==id)` dentro do handler de `dpDlBtn`).
+
+### People — Modal central da Pessoa
+Clicar num `.person-card` (ou no botão "+ Pessoa") chama `openPerson(id)`, que **não usa o side panel** — abre o mesmo modal centralizado do Data Product (`#dpModalWrap`/`openDPModal()`/`closeDPModal()`), reusado porque o editor de pessoa precisa de mais espaço (cargo, skills, achievements, conexões, duplicar). Estrutura do corpo do modal:
+- Campos Nome/Cargo (`fld`).
+- **Skills** (`renderPersonSkillsArea`): badges com `×` de remover + input para adicionar uma skill por vez (atende ao requisito de "adicionar 1 por 1", em vez de um campo de texto livre). Pessoa nova ainda não salva mostra "Salve a pessoa antes de adicionar skills."
+- **Achievements** (`renderPersonAchArea`): lista clicável + formulário inline (título/descrição/data) ativado por `_personAchEdit`, no mesmo padrão do `renderDPSubsArea`/`.dp-subform` do Data Product.
+- **Projetos conectados** (`renderPersonConnArea`): lista as conexões do grafo que tocam `"pe-"+id`, com slider de intensidade e botão de remover. O botão "+ Conexão" fecha o modal (`closeDPModal()`) e abre o side panel `openAddEdgePanel("pe-"+id, id)` — ao salvar ou clicar "Voltar", o side panel fecha e o modal da pessoa reabre (`openPerson(id)`), em vez de cair no `openNodePanel` genérico.
+- Botões no footer: Salvar / **Duplicar** / Excluir / Fechar. "Duplicar" cria uma nova pessoa copiando nome+cargo+skills (com IDs novos) — usado para aproveitar rapidamente o cadastro de uma pessoa parecida.
+- Ao salvar uma pessoa **nova**, o modal **permanece aberto** reabrindo `openPerson(newId)` (diferente do padrão do Data Product, que fecha) — desvio de UX deliberado para permitir adicionar skills/achievements/conexões imediatamente após o primeiro save, sem precisar reabrir o card.
+- Excluir uma pessoa remove em cascata: a própria pessoa, suas skills (`peopleSkills`), seus achievements (`peopleAch`), suas conexões (`gEdges` tocando `"pe-"+id`) e o cache de posição em `gNodes`.
+
+### People — Grafo dedicado (Pessoas ↔ Projetos)
+Como o filtro do grafo principal (`graphFilter`) é single-select (não dá pra ver pessoas e projetos juntos sem trocar de filtro), a aba People tem seu **próprio** canvas (`#peopleGraphCanvas`, instância separada `peopleGraph`) que sempre mostra só nós dos tipos `pessoa` e `projeto`, via `initPeopleGraph()`/`renderPeopleGraphView()`. Clicar num nó (inclusive de pessoa) abre o editor **genérico** `openNodePanel`, igual ao grafo principal — a edição rica de pessoa acontece pelo card da aba People, não pelo clique no grafo. `renderPeople()` (como `renderGrafo()`) é **excluído** de `renderAll()` porque o canvas só pode ser dimensionado corretamente com a aba visível — é chamado explicitamente em `switchTab(t)` quando `t==="people"`.
 
 ### FUP — dois tipos
 - **`tipo: "acomp"`** — atividades de acompanhamento com Título, Responsável, Prazo, Prioridade, Status, checkbox "👁 Acompanhar". Renderizado em kanban por status.
@@ -300,6 +334,7 @@ pilar:   {color:"#4F70F5", r:22, label:"Pillar"}
 produto: {color:"#0DAF7B", r:17, label:"Digital Product"}
 projeto: {color:"#D97706", r:13, label:"Project"}
 dominio: {color:"#7C3AED", r:16, label:"Data Domain"}
+pessoa:  {color:"#DB2777", r:15, label:"Pessoa"}
 ```
 
 ### FUP_STATUS / FUP_PRIO
