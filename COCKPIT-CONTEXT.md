@@ -7,7 +7,7 @@
 
 Um **arquivo HTML único** (~764 KB) que funciona como cockpit digital de estratégia para o Head of Digital Solutions & Services de uma fabricante de aeronaves (contexto Embraer). Sem servidor, sem instalação — abre direto no Chrome/Edge 86+.
 
-**Nome do arquivo:** `COCKPIT-ABRIR-AQUI22.html` (arquivo canônico atual; versões anteriores ficam no repo só por histórico — baixe sempre o número mais alto)
+**Nome do arquivo:** `COCKPIT-ABRIR-AQUI23.html` (arquivo canônico atual; versões anteriores ficam no repo só por histórico — baixe sempre o número mais alto)
 **Tech stack:** Vanilla HTML + CSS + JavaScript, SheetJS (embedded, ~624 KB), File System Access API, IndexedDB
 **Persistência:** Lê/escreve um arquivo `.xlsx` local via File System Access API do browser. Sem backend.
 **Primeiro uso:** Cria o Excel com dados seed automaticamente.
@@ -48,6 +48,7 @@ estrategia.xlsx            (banco de dados do usuário — Excel local)
 | `people` | 👥 People | `view-people` |
 | `melhorias` | Improvements & SF | `view-melhorias` |
 | `budget` | 💰 Budget | `view-budget` |
+| `prateleira` | 🏷 Prateleira | `view-prateleira` |
 | `fup` | 📋 FUP | `view-fup` |
 | `admin` | ⚙ Admin | `view-admin` |
 
@@ -59,6 +60,7 @@ estrategia.xlsx            (banco de dados do usuário — Excel local)
 - People → `+ Pessoa`
 - Improvements → `+ Initiative`
 - Budget → `+ Item`
+- Prateleira → `+ Item`
 - FUP → `+ Atividade`
 - Graph, Admin → oculto
 
@@ -88,6 +90,7 @@ let fup          = [];    // atividades de acompanhamento e informativos (FUP ta
 let people       = [];    // pessoas (People tab) — {id, name, cargo}
 let peopleSkills = [];    // skills de cada pessoa (fk personId), uma linha por skill
 let peopleAch    = [];    // achievements de cada pessoa (fk personId) — {id, personId, title, descr, date}
+let prateleira   = [];    // catálogo de recursos/serviços (Prateleira tab) — {id, name, categoria, valor, moeda, unidade, notas}
 
 // Runtime only (não persistido)
 let betFilter    = null;
@@ -132,6 +135,7 @@ let _personAchEdit = null; // null | "new" | id do achievement em edição no mo
 | `people` | Pessoas | `id`, `name`, `cargo` |
 | `people_skills` | Skills de cada pessoa (fk `personId`) | `id`, `personId`, `skill` |
 | `people_achievements` | Achievements de cada pessoa (fk `personId`) | `id`, `personId`, `title`, `descr`, `date` |
+| `prateleira` | Catálogo de recursos/serviços com valor de referência | `id`, `name`, `categoria`, `valor`, `moeda`, `unidade`, `notas` |
 
 ---
 
@@ -198,6 +202,7 @@ Qualquer edição → save() → debounce 700ms → _write()
 | `_pdate(s)` | Helper: converte string em `Date` válido ou `null` |
 | `renderMelhorias()` | Aba Improvements & SF |
 | `renderBudget()` | Aba Budget — KPIs + tabela por categoria com `<meter>` |
+| `renderPrateleira()` | Aba Prateleira — KPIs + tabela por categoria com valor formatado por moeda/unidade (`fmtMoeda`) |
 | `renderFup()` | Aba FUP — kanban Acompanhamento + lista Informativo |
 | `renderAdmin()` | Aba Admin |
 | `renderPeople()` | Aba People — KPIs + board de cards (`personCard`) + chama `renderPeopleGraphView()` |
@@ -220,6 +225,7 @@ Qualquer edição → save() → debounce 700ms → _write()
 | `openProject(id)` | Portfolio project (null = novo) |
 | `openMel(id)` | Improvement/SF initiative (null = novo) |
 | `openBudget(id)` | Item de custo Budget (null = novo) |
+| `openPrateleira(id)` | Item da Prateleira (null = novo) |
 | `openFup(id)` | Atividade FUP (null = novo) |
 | `openThemePanel(i)` | Vision theme |
 | `openPrinciplePanel(i)` | Data principle |
@@ -250,6 +256,9 @@ Tanto `openAddEdgePanel(fromId, personId?)` quanto `openAddEdgePanelGlobal()` us
 
 ### Budget — barra de execução
 Usa `<meter>` HTML nativo (não `<div>`) com CSS customizado via `::-webkit-meter-*` para manter o visual consistente com o design system. Cores automáticas por threshold via atributos `low`, `high`, `optimum`. Parsing numérico defensivo via `parseFloat(String(v).replace(/[^0-9.]/g,""))` para lidar com valores do SheetJS que podem chegar como string.
+
+### Prateleira — catálogo de recursos/serviços (rate card)
+Catálogo simples de itens reutilizáveis para referência de custo (ex.: "Recurso Engenharia — US$ 55/hora", "Suporte — R$ 10 mil/mês"), agrupado por categoria igual ao Budget, mas **multi-moeda** (`moeda`: BRL/USD/EUR) e com unidade de cobrança (`unidade`: hora/dia/mês/ano/projeto/único). Como cada item pode estar numa moeda diferente, não há somatório de valores nos KPIs — só contagens (Itens/Categorias/Moedas). Formatação de valor via `fmtMoeda(v, moeda)` (mirror de `fmtBRL` mas parametrizado por símbolo de moeda, `CUR_SYM`) + sufixo de unidade via `UNIDADE_LABEL`. CRUD via side panel padrão (`openPrateleira`/`#panel`), sem modal central — não tem sub-entidades (skills/achievements/subprojetos) como People/Data Product, então não precisou do `#dpModalWrap`. Ainda não conectado a outras abas (ex.: Budget) — fica como catálogo de referência manual por enquanto.
 
 ### Portfolio — Gantt de todos os projetos
 A aba Portfolio tem uma seção de Gantt (`renderGanttPortfolio()`) acima do board de cards, agrupada por horizonte (Now/Scale/Differentiation), com linha vertical de "hoje" e ticks de tempo adaptativos (mensal, bimestral, trimestral ou semestral conforme o intervalo total). É recolhível via `toggleGantt()` (estado `_ganttOpen`, não persistido). Clicar numa barra ou no nome do projeto (`.g-bar`/`.g-label`) abre o mesmo painel de edição (`openProject`) usado pelos cards — não há uma visão separada "somente leitura". Projetos sem `start`/`end` cadastrados recebem um intervalo padrão de ~3 meses (`projRange()`) só para exibição; os campos no Excel continuam vazios até o usuário editar.
