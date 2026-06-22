@@ -206,6 +206,8 @@ Colunas (`SH.graph_nodes`): `id, type, label, group`.
 
 Nós também podem ter posição salva (`x`, `y`) em memória, usada pelo layout do grafo, mas isso é tratado como estado de layout, não uma coluna persistida explicitamente listada em `SH.graph_nodes` (a posição não é serializada nesta aba).
 
+**Visibilidade dos nós de projeto (`pj-`):** com 150+ projetos cadastrados, só os com `status==="Active"` são desenhados no canvas do Graph/People e oferecidos como opção de destino ao criar uma conexão nova (`isGraphVisible()` no código). Projetos com outro status não aparecem no grafo, mas conexões (`graph_edges`) já existentes envolvendo esses projetos não são removidas nem corrompidas — continuam listadas corretamente (com nome resolvido) nas telas de detalhe do nó/pessoa, só não são desenhadas no canvas até o projeto voltar a `Active`.
+
 ### 3.13 `graph_edges` — Conexões do grafo
 
 Colunas (`SH.graph_edges`): `from, to, intensity, label`.
