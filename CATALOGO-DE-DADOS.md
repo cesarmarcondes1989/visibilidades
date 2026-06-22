@@ -154,7 +154,7 @@ Sem ID próprio — editado por índice no array. `atual`/`alvo` são escalas de
 
 ### 3.10 `projects` — Projetos do portfólio
 
-Colunas (`SH.projects`): `id, hz, pillar, bet, name, descr, inv, rec, prog, status, start, end`.
+Colunas (`SH.projects`): `id, hz, pillar, bet, name, descr, inv, costAvoidance, costReduction, efficiencyGains, revenue, prog, status, start, end`.
 
 | Coluna | Tipo | Observações |
 |---|---|---|
@@ -164,12 +164,17 @@ Colunas (`SH.projects`): `id, hz, pillar, bet, name, descr, inv, rec, prog, stat
 | `bet` | string | FK lógica → `bets.id` (aposta vinculada) |
 | `name` | texto | Nome do projeto |
 | `descr` | texto longo | Descrição |
-| `inv` | número (R$) | Investimento |
-| `rec` | número (R$) | Retorno esperado |
+| `inv` | número (US$) | Investimento |
+| `costAvoidance` | número (US$) | Ganho tipo "Cost Avoidance" |
+| `costReduction` | número (US$) | Ganho tipo "Cost Reduction" |
+| `efficiencyGains` | número (US$) | Ganho tipo "Efficiency Gains" |
+| `revenue` | número (US$) | Ganho tipo "Revenue" |
 | `prog` | número 0–100 | Progresso (%) |
 | `status` | enum | um dos valores de `STLIST` (ver §5) |
 | `start` | data (ISO) | Início |
 | `end` | data (ISO) | Fim |
+
+Diferente das demais entidades financeiras do app (BRL por padrão), `projects` é a única tabela cujos valores monetários são em **USD** — formatados com `fmtMoeda(v,"USD")`, não `fmtBRL`. O retorno total de um projeto é a soma dos 4 campos de ganho (`projReturn(p)` no código), usado para o ROI por card (`roi(p.inv, projReturn(p))`); não existe um campo único de "retorno esperado" em `projects` (esse padrão antigo, campo `rec`, permanece apenas em `melhorias`, abaixo, que é uma entidade não relacionada e continua em BRL).
 
 Cada projeto também gera, em tempo de execução, um **nó de grafo derivado** (`pj-`+id, tipo `projeto`) — ver §2 nota sobre nós virtuais.
 
@@ -390,4 +395,4 @@ Não há chaves estrangeiras de banco de dados (Excel não impõe integridade re
 - `themes` e `principles` não são entidades de topo independentes — são sub-listas de `_vision` e `_data_vision`, respectivamente, mesmo estando em abas separadas no Excel.
 - Cuidado ao comparar status entre `melhorias` e as demais entidades (`bets`/`projects`/`dp_subs`) — usam listas de enum diferentes (ver §5).
 - Datas são sempre strings no formato ISO `YYYY-MM-DD` (inputs `type="date"` do HTML).
-- Valores monetários (`inv`, `rec`, `anual`, `ytd`, `valor`) são números (R$ por padrão, exceto `prateleira.valor` que tem moeda própria via `moeda`).
+- Valores monetários (`inv`, `rec`, `anual`, `ytd`, `valor`) são números — R$ por padrão, exceto `projects` (todos os campos financeiros em US$: `inv`, `costAvoidance`, `costReduction`, `efficiencyGains`, `revenue`) e `prateleira.valor`, que tem moeda própria via `moeda`.

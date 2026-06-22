@@ -125,7 +125,7 @@ let _personAchEdit = null; // null | "new" | id do achievement em edição no mo
 | `dp_subs` | Subprojetos de cada data product | `id`, `dpId`, `name`, `descr`, `status`, `prog`, `start`, `end` |
 | `maturity` | Governance maturity | `id`, `name`, `atual`, `alvo`, `owner` |
 | `governance` | Governance capabilities | `name`, `atual`, `alvo`, `owner`, `note` |
-| `projects` | Portfolio projects | `id`, `hz`, `pillar`, `bet`, `name`, `descr`, `inv`, `rec`, `prog`, `status`, `start`, `end` |
+| `projects` | Portfolio projects | `id`, `hz`, `pillar`, `bet`, `name`, `descr`, `inv`, `costAvoidance`, `costReduction`, `efficiencyGains`, `revenue`, `prog`, `status`, `start`, `end` |
 | `melhorias` | Improvements & SF | `id`, `area`, `name`, `status`, `inv`, `rec`, `prog`, `notas` |
 | `graph_nodes` | Graph nodes (exceto projeto/pessoa, que são derivados) | `id`, `type`, `label`, `group`, `x`, `y` |
 | `graph_edges` | Graph edges | `from`, `to`, `intensity`, `label` |
@@ -262,15 +262,21 @@ Usa `<meter>` HTML nativo (não `<div>`) com CSS customizado via `::-webkit-mete
 ### Prateleira — catálogo de recursos/serviços (rate card)
 Catálogo simples de itens reutilizáveis para referência de custo (ex.: "Recurso Engenharia — US$ 55/hora", "Suporte — R$ 10 mil/mês"), agrupado por categoria igual ao Budget, mas **multi-moeda** (`moeda`: BRL/USD/EUR) e com unidade de cobrança (`unidade`: hora/dia/mês/ano/projeto/único). Como cada item pode estar numa moeda diferente, não há somatório de valores nos KPIs — só contagens (Itens/Categorias/Moedas). Formatação de valor via `fmtMoeda(v, moeda)` (mirror de `fmtBRL` mas parametrizado por símbolo de moeda, `CUR_SYM`) + sufixo de unidade via `UNIDADE_LABEL`. CRUD via side panel padrão (`openPrateleira`/`#panel`), sem modal central — não tem sub-entidades (skills/achievements/subprojetos) como People/Data Product, então não precisou do `#dpModalWrap`. Ainda não conectado a outras abas (ex.: Budget) — fica como catálogo de referência manual por enquanto.
 
+### Portfolio — 4 tipos de retorno (USD)
+Cada projeto tem investimento (`inv`) + 4 campos de ganho independentes — `costAvoidance`, `costReduction`, `efficiencyGains`, `revenue` — todos em **USD** (formatados via `fmtMoeda(v,"USD")`, não `fmtBRL`; distinto do resto do app, que é BRL por padrão). `projReturn(p)` soma os 4 campos para obter o retorno total de um projeto, usado no badge de ROI por card (`roi(p.inv, projReturn(p))`) e na linha financeira do card (`Invest`/`Return`). Não há campo único `rec` em `projects` (esse campo só existe em `melhorias`, que é uma entidade não relacionada).
+
+### Portfolio — KPIs do topo (reativos aos filtros)
+`#kpi-portfolio` mostra 7 cards: Total Invested, Cost Avoidance, Cost Reduction, Efficiency Gains, Revenue, Total Projects, Active Projects. Todos calculados por `renderPortfolio()` a partir de `portfolioFilteredProjects()` (não de `projects` direto) — ou seja, os mesmos filtros do Gantt (Período/Status/Pilar) recalculam os 7 KPIs **e** a lista de cards do board (`portfolio-board`), mantendo as três visões da aba (KPIs / Gantt / board) sempre consistentes entre si. Não existe mais um card "Portfolio ROI" nesta barra (o ROI permanece visível por projeto, no badge de cada card).
+
 ### Portfolio — Gantt de todos os projetos
 A aba Portfolio tem uma seção de Gantt (`renderGanttPortfolio()`) acima do board de cards, agrupada por horizonte (Now/Scale/Differentiation), com linha vertical de "hoje" e ticks de tempo adaptativos (mensal, bimestral, trimestral ou semestral conforme o intervalo total). É recolhível via `toggleGantt()` (estado `_ganttOpen`, não persistido). Clicar numa barra ou no nome do projeto (`.g-bar`/`.g-label`) abre o mesmo painel de edição (`openProject`) usado pelos cards — não há uma visão separada "somente leitura". Projetos sem `start`/`end` cadastrados recebem um intervalo padrão de ~3 meses (`projRange()`) só para exibição; os campos no Excel continuam vazios até o usuário editar.
 
-### Portfolio — Filtros do Gantt
+### Portfolio — Filtros do Gantt (compartilhados com KPIs e board)
 Acima do gráfico (`#gantt-filters`, desenhado por `renderGanttFilters()`) há três grupos de filtro, todos em estado runtime não persistido:
 - **Período** (`ganttDateFrom`/`ganttDateTo`, inputs `<input type=date>` com `onchange`): quando preenchido, define o início/fim da janela visível do Gantt (em vez do range calculado automaticamente a partir dos projetos) e esconde projetos cujo intervalo não tem overlap com o período escolhido. Botão "Limpar" aparece só quando algum dos dois está preenchido.
 - **Status** (`ganttStatusFilter`, `Set` com os valores de `STLIST`): chips estilo `.chip` com toggle multi-seleção (clique adiciona/remove do Set); chip "All" limpa o Set. Set vazio = sem filtro (mostra todos os status).
 - **Pilar** (`ganttPillarFilter`, `Set` com `pillar.id`): mesmo padrão de chips multi-seleção, usando o array `pillars` (cores reais por pilar).
-Os três filtros se combinam (AND) dentro de `renderGanttPortfolio()`, que filtra `projects` antes de calcular `ranges`/`minD`/`maxD`. Os cliques nos chips são capturados pelo listener delegado em `#view-portfolio` (`[data-gst]`/`[data-gpl]`), que chama `renderGanttPortfolio()` a cada toggle.
+Os três filtros se combinam (AND) dentro de `portfolioFilteredProjects()`, helper compartilhado usado tanto por `renderGanttPortfolio()` (linhas do Gantt) quanto por `renderPortfolio()` (KPIs do topo + cards do board). Os cliques nos chips e a troca das datas chamam `renderPortfolio()` (não mais `renderGanttPortfolio()` direto), garantindo que KPIs/board/Gantt fiquem sempre em sincronia a cada toggle de filtro.
 
 ### Data Strategy — Modal central do Data Product
 Clicar numa linha `.dp-row` (ou no botão "+ Data Product") chama `openDP(id)`, que **não usa mais o side panel** (`#scrim`/`#panel`) — em vez disso abre um modal centralizado (`#dpModalWrap` → `.cmodal`), com `openDPModal()`/`closeDPModal()` análogos a `openPanel()`/`closePanel()`. Estrutura do modal:
