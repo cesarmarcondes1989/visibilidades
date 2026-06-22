@@ -785,12 +785,12 @@ const DEFAULT_EDGES = [
 ];
 
 const DEFAULT_PROJECTS = [
-  {id:"proj1",hz:"h1",pillar:"mro",bet:"b1",name:"Beacon Expansion v3",descr:"Onboarding 20 operators, mobile module, AOG integration.",inv:2500000,rec:6000000,prog:65,status:"Active",start:"2025-11-01",end:"2026-08-31"},
-  {id:"proj2",hz:"h1",pillar:"dados",bet:"b2",name:"Lakehouse v2",descr:"Unified data lake, ERP/PLM/Beacon pipelines, initial catalog.",inv:3200000,rec:0,prog:30,status:"Active",start:"2026-02-01",end:"2026-12-31"},
-  {id:"proj3",hz:"h1",pillar:"mat",bet:"b3",name:"Parts e-commerce + Digital pool",descr:"Digital parts purchasing channel and pool management.",inv:900000,rec:2700000,prog:100,status:"Done",start:"2025-03-01",end:"2025-10-31"},
-  {id:"proj4",hz:"h2",pillar:"saude",bet:"b4",name:"AHEAD Phase 2 — predictive at scale",descr:"Integrated telemetry, new prognostic models, fleet dashboard.",inv:1800000,rec:4200000,prog:40,status:"Bet",start:"2026-01-01",end:"2027-06-30"},
-  {id:"proj5",hz:"h2",pillar:"ia",bet:"b6",name:"GenAI Co-pilot for Technicians",descr:"AI assistant with RAG over technical documentation and failure history.",inv:400000,rec:1500000,prog:10,status:"Bet",start:"2026-05-01",end:"2027-02-28"},
-  {id:"proj6",hz:"h2",pillar:"mro",bet:"b7",name:"SF Customer 360",descr:"Unified operator view in Salesforce with fleet history.",inv:600000,rec:1800000,prog:50,status:"Active",start:"2025-10-01",end:"2026-09-30"}
+  {id:"proj1",hz:"h1",pillar:"mro",bet:"b1",name:"Beacon Expansion v3",descr:"Onboarding 20 operators, mobile module, AOG integration.",inv:2500000,costAvoidance:2000000,costReduction:0,efficiencyGains:0,revenue:4000000,prog:65,status:"Active",start:"2025-11-01",end:"2026-08-31"},
+  {id:"proj2",hz:"h1",pillar:"dados",bet:"b2",name:"Lakehouse v2",descr:"Unified data lake, ERP/PLM/Beacon pipelines, initial catalog.",inv:3200000,costAvoidance:0,costReduction:0,efficiencyGains:0,revenue:0,prog:30,status:"Active",start:"2026-02-01",end:"2026-12-31"},
+  {id:"proj3",hz:"h1",pillar:"mat",bet:"b3",name:"Parts e-commerce + Digital pool",descr:"Digital parts purchasing channel and pool management.",inv:900000,costAvoidance:0,costReduction:0,efficiencyGains:0,revenue:2700000,prog:100,status:"Done",start:"2025-03-01",end:"2025-10-31"},
+  {id:"proj4",hz:"h2",pillar:"saude",bet:"b4",name:"AHEAD Phase 2 — predictive at scale",descr:"Integrated telemetry, new prognostic models, fleet dashboard.",inv:1800000,costAvoidance:3000000,costReduction:0,efficiencyGains:1200000,revenue:0,prog:40,status:"Bet",start:"2026-01-01",end:"2027-06-30"},
+  {id:"proj5",hz:"h2",pillar:"ia",bet:"b6",name:"GenAI Co-pilot for Technicians",descr:"AI assistant with RAG over technical documentation and failure history.",inv:400000,costAvoidance:0,costReduction:0,efficiencyGains:1500000,revenue:0,prog:10,status:"Bet",start:"2026-05-01",end:"2027-02-28"},
+  {id:"proj6",hz:"h2",pillar:"mro",bet:"b7",name:"SF Customer 360",descr:"Unified operator view in Salesforce with fleet history.",inv:600000,costAvoidance:0,costReduction:0,efficiencyGains:0,revenue:1800000,prog:50,status:"Active",start:"2025-10-01",end:"2026-09-30"}
 ];
 
 const DEFAULT_MEL = [
@@ -887,7 +887,7 @@ const SH={
   dp_subs:      ["id","dpId","name","descr","status","prog","start","end"],
   maturity:     ["id","name","atual","alvo","owner"],
   governance:   ["name","atual","alvo","owner","note"],
-  projects:     ["id","hz","pillar","bet","name","descr","inv","rec","prog","status","start","end"],
+  projects:     ["id","hz","pillar","bet","name","descr","inv","costAvoidance","costReduction","efficiencyGains","revenue","prog","status","start","end"],
   melhorias:    ["id","area","name","status","inv","rec","prog","notas"],
   graph_nodes:  ["id","type","label","group"],
   graph_edges:  ["from","to","intensity","label"],
@@ -1439,10 +1439,19 @@ function renderGanttFilters(){
     </div>
     <div class="gf-group"><label class="gf-label">Status</label><div class="chip-row">${stChips}</div></div>
     <div class="gf-group"><label class="gf-label">Pilar</label><div class="chip-row">${plChips}</div></div>`;
-  document.getElementById("gf-from").onchange=e=>{ganttDateFrom=e.target.value||null;renderGanttPortfolio();};
-  document.getElementById("gf-to").onchange=e=>{ganttDateTo=e.target.value||null;renderGanttPortfolio();};
+  document.getElementById("gf-from").onchange=e=>{ganttDateFrom=e.target.value||null;renderPortfolio();};
+  document.getElementById("gf-to").onchange=e=>{ganttDateTo=e.target.value||null;renderPortfolio();};
   const clr=document.getElementById("gf-clear-dates");
-  if(clr)clr.onclick=()=>{ganttDateFrom=null;ganttDateTo=null;renderGanttPortfolio();};
+  if(clr)clr.onclick=()=>{ganttDateFrom=null;ganttDateTo=null;renderPortfolio();};
+}
+function projReturn(p){return (+p.costAvoidance||0)+(+p.costReduction||0)+(+p.efficiencyGains||0)+(+p.revenue||0);}
+function portfolioFilteredProjects(){
+  let list=projects;
+  if(ganttStatusFilter.size)list=list.filter(p=>ganttStatusFilter.has(p.status));
+  if(ganttPillarFilter.size)list=list.filter(p=>ganttPillarFilter.has(p.pillar));
+  const fFrom=_pdate(ganttDateFrom),fTo=_pdate(ganttDateTo);
+  if(fFrom||fTo)list=list.filter(p=>{const r=projRange(p);return (!fTo||r.s<=fTo)&&(!fFrom||r.e>=fFrom);});
+  return list;
 }
 function renderGanttPortfolio(){
   renderGanttFilters();
@@ -1451,12 +1460,9 @@ function renderGanttPortfolio(){
     box.innerHTML=`<div style="text-align:center;padding:30px;color:var(--muted);font-size:13px">Nenhum projeto cadastrado.</div>`;
     return;
   }
-  let list=projects;
-  if(ganttStatusFilter.size)list=list.filter(p=>ganttStatusFilter.has(p.status));
-  if(ganttPillarFilter.size)list=list.filter(p=>ganttPillarFilter.has(p.pillar));
+  const list=portfolioFilteredProjects();
   const fFrom=_pdate(ganttDateFrom),fTo=_pdate(ganttDateTo);
-  let ranges=list.map(p=>({p,...projRange(p)}));
-  if(fFrom||fTo)ranges=ranges.filter(r=>(!fTo||r.s<=fTo)&&(!fFrom||r.e>=fFrom));
+  const ranges=list.map(p=>({p,...projRange(p)}));
   if(!ranges.length){
     box.innerHTML=`<div style="text-align:center;padding:30px;color:var(--muted);font-size:13px">Nenhum projeto corresponde aos filtros selecionados.</div>`;
     return;
@@ -1467,21 +1473,27 @@ function renderGanttPortfolio(){
 
 // ══ RENDER PORTFOLIO ═════════════════════════════════════════════════
 function renderPortfolio(){
-  const tot=projects.reduce((s,p)=>s+(+p.inv||0),0);
-  const gan=projects.reduce((s,p)=>s+(+p.rec||0),0);
-  const rc=roi(tot,gan);
+  const list=portfolioFilteredProjects();
+  const tot=list.reduce((s,p)=>s+(+p.inv||0),0);
+  const ca=list.reduce((s,p)=>s+(+p.costAvoidance||0),0);
+  const cr=list.reduce((s,p)=>s+(+p.costReduction||0),0);
+  const eg=list.reduce((s,p)=>s+(+p.efficiencyGains||0),0);
+  const rv=list.reduce((s,p)=>s+(+p.revenue||0),0);
   document.getElementById("kpi-portfolio").innerHTML=
-    kpi("Total Invested",fmtBRL(tot),"in strategic projects","re")+
-    kpi("Expected Return",fmtBRL(gan),"projected revenue + gain","gr")+
-    kpi("Portfolio ROI",rc.t,"on total invested","")+
-    kpi("Active Projects",projects.filter(p=>p.status==="Active"||p.status==="Bet").length,"in progress","");
+    kpi("Total Invested",fmtMoeda(tot,"USD"),"in strategic projects","re")+
+    kpi("Cost Avoidance",fmtMoeda(ca,"USD"),"return type","gr")+
+    kpi("Cost Reduction",fmtMoeda(cr,"USD"),"return type","gr")+
+    kpi("Efficiency Gains",fmtMoeda(eg,"USD"),"return type","gr")+
+    kpi("Revenue",fmtMoeda(rv,"USD"),"return type","gr")+
+    kpi("Total Projects",list.length,"matching filters","")+
+    kpi("Active Projects",list.filter(p=>p.status==="Active"||p.status==="Bet").length,"in progress","");
   renderGanttPortfolio();
   const board=document.getElementById("portfolio-board");
   board.innerHTML=HZ.map(h=>{
-    const ps=projects.filter(p=>p.hz===h.id);if(!ps.length)return "";
+    const ps=list.filter(p=>p.hz===h.id);if(!ps.length)return "";
     const cards=ps.map(p=>{
       const hd=HZM[p.hz];const sc=STATUS_COLORS[p.status]||"#94A3B8";
-      const r=roi(p.inv,p.rec);const pl=PMAP[p.pillar];
+      const ret=projReturn(p);const r=roi(p.inv,ret);const pl=PMAP[p.pillar];
       return `<button class="p-card" data-pid="${p.id}">
         <div class="pc-ht" style="color:${hd.color}">${hd.name} · ${hd.period}</div>
         <div class="pc-name">${p.name}</div>
@@ -1491,7 +1503,7 @@ function renderPortfolio(){
           ${badgeHtml(p.status,sc)}${pl?badgeHtml(pl.name,pl.color):""}
           <span class="roi ${r.c}" style="margin-left:auto">${r.t}</span>
         </div>
-        <div class="pc-fin"><span>Invest <b>${fmtBRL(p.inv)}</b></span><span>Return <b>${fmtBRL(p.rec)}</b></span></div>
+        <div class="pc-fin"><span>Invest <b>${fmtMoeda(p.inv,"USD")}</b></span><span>Return <b>${fmtMoeda(ret,"USD")}</b></span></div>
         <div class="pc-prog"><div class="pc-prog-fill" style="width:${Math.min(100,+(p.prog)||0)}%;background:${hd.color}"></div></div>
         <div class="pc-prog-text">${(+p.prog||0)}% complete</div>
       </button>`;
@@ -2574,12 +2586,16 @@ function openProject(id){
     sel("Linked bet","bet",p.bet||"",bets.map(b=>({v:b.id,t:b.name})))+
     fld("Project name","name",p.name)+ta("Description","descr",p.descr)+
     fld("Start date","start",p.start,"date")+fld("End date","end",p.end,"date")+
-    fld("Investment (R$)","inv",p.inv||0,"number")+fld("Expected Return (R$)","rec",p.rec||0,"number")+
+    fld("Investment (US$)","inv",p.inv||0,"number")+
+    fld("Cost Avoidance (US$)","costAvoidance",p.costAvoidance||0,"number")+
+    fld("Cost Reduction (US$)","costReduction",p.costReduction||0,"number")+
+    fld("Efficiency Gains (US$)","efficiencyGains",p.efficiencyGains||0,"number")+
+    fld("Revenue (US$)","revenue",p.revenue||0,"number")+
     sldr("Progress (%)","prog",p.prog||0,0,100)+sel("Status","status",p.status||"Exploração",STLIST);
   document.getElementById("panelFoot").innerHTML=`<button class="primary" id="svBtn">Save</button>${!isNew?`<button class="danger" id="dlBtn">Delete</button>`:""}`;
   bindSliders();
   document.getElementById("svBtn").onclick=()=>{
-    const d={hz:gv("hz"),pillar:gv("pillar"),bet:gv("bet"),name:gv("name"),descr:gv("descr"),start:gv("start"),end:gv("end"),inv:+gv("inv"),rec:+gv("rec"),prog:+gv("prog"),status:gv("status")};
+    const d={hz:gv("hz"),pillar:gv("pillar"),bet:gv("bet"),name:gv("name"),descr:gv("descr"),start:gv("start"),end:gv("end"),inv:+gv("inv"),costAvoidance:+gv("costAvoidance"),costReduction:+gv("costReduction"),efficiencyGains:+gv("efficiencyGains"),revenue:+gv("revenue"),prog:+gv("prog"),status:gv("status")};
     if(isNew){projects.push({id:"proj"+Date.now(),...d});toast("Project added");}else{Object.assign(projects.find(x=>x.id===id),d);toast("Saved");}
     save();renderPortfolio();closePanel();
   };
@@ -2641,9 +2657,9 @@ document.getElementById("view-dados").addEventListener("click",e=>{const r=e.tar
 document.getElementById("view-portfolio").addEventListener("click",e=>{
   if(e.target.closest("#gantt-toggle")){toggleGantt();return;}
   const gst=e.target.closest("[data-gst]");
-  if(gst){const v=gst.dataset.gst;if(!v)ganttStatusFilter.clear();else ganttStatusFilter.has(v)?ganttStatusFilter.delete(v):ganttStatusFilter.add(v);renderGanttPortfolio();return;}
+  if(gst){const v=gst.dataset.gst;if(!v)ganttStatusFilter.clear();else ganttStatusFilter.has(v)?ganttStatusFilter.delete(v):ganttStatusFilter.add(v);renderPortfolio();return;}
   const gpl=e.target.closest("[data-gpl]");
-  if(gpl){const v=gpl.dataset.gpl;if(!v)ganttPillarFilter.clear();else ganttPillarFilter.has(v)?ganttPillarFilter.delete(v):ganttPillarFilter.add(v);renderGanttPortfolio();return;}
+  if(gpl){const v=gpl.dataset.gpl;if(!v)ganttPillarFilter.clear();else ganttPillarFilter.has(v)?ganttPillarFilter.delete(v):ganttPillarFilter.add(v);renderPortfolio();return;}
   const c=e.target.closest(".p-card,.g-bar,.g-label");
   if(c&&c.dataset.pid)openProject(c.dataset.pid);
 });
