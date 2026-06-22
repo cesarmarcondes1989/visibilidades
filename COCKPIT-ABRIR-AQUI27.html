@@ -1341,13 +1341,19 @@ function getEffectiveGraphNodes(){
   });
   return [...nonDerived,...projNodes,...peopleNodes];
 }
+// Nó de projeto é "visível" no grafo só se o projeto estiver com status Active — evita poluir o grafo com 150+ projetos
+function isGraphVisible(n){
+  if(n.type!=="projeto")return true;
+  const p=projects.find(x=>"pj-"+x.id===n.id);
+  return !!p&&p.status==="Active";
+}
 
 function initGraph(){
   const canvas=document.getElementById("graphCanvas");
   if(graph){graph.destroy();graph=null;}
   const allNodes=getEffectiveGraphNodes();
   const filterFn=n=>!graphFilter.size||graphFilter.has(n.type);
-  const visNodes=allNodes.filter(filterFn);
+  const visNodes=allNodes.filter(filterFn).filter(isGraphVisible);
   const visIds=new Set(visNodes.map(n=>n.id));
   const visEdges=gEdges.filter(e=>visIds.has(e.from)&&visIds.has(e.to));
   graph=new ForceGraph(canvas,visNodes,visEdges);
@@ -1594,7 +1600,7 @@ function initPeopleGraph(){
   if(!canvas)return;
   if(peopleGraph){peopleGraph.destroy();peopleGraph=null;}
   const filterFn=n=>!peopleGraphFilter.size||peopleGraphFilter.has(n.type);
-  const visNodes=getEffectiveGraphNodes().filter(filterFn);
+  const visNodes=getEffectiveGraphNodes().filter(filterFn).filter(isGraphVisible);
   const visIds=new Set(visNodes.map(n=>n.id));
   const visEdges=gEdges.filter(e=>visIds.has(e.from)&&visIds.has(e.to));
   peopleGraph=new ForceGraph(canvas,visNodes,visEdges);
@@ -2248,7 +2254,7 @@ function openAddEdgePanel(fromId,personId){
     // Nós já conectados (existentes + staged)
     const existingTaken=new Set(gEdges.filter(e=>e.from===fromId||e.to===fromId).map(e=>e.from===fromId?e.to:e.from));
     const stagedTaken=new Set(_staged.map(s=>s.to));
-    const opts=_allNodes.filter(n=>n.id!==fromId&&!existingTaken.has(n.id)&&!stagedTaken.has(n.id));
+    const opts=_allNodes.filter(n=>n.id!==fromId&&!existingTaken.has(n.id)&&!stagedTaken.has(n.id)&&isGraphVisible(n));
 
     document.getElementById("panelTitle").textContent="Adicionar Conexões";
 
@@ -2325,7 +2331,7 @@ function openAddEdgePanelGlobal(){
 
   function _render(){
     const _allNodes=getEffectiveGraphNodes();
-    const mkOpts=(excludeFrom,excludeTo)=>_allNodes.map(n=>{
+    const mkOpts=(excludeFrom,excludeTo)=>_allNodes.filter(isGraphVisible).map(n=>{
       const nt=NODE_TYPES[n.type]||{label:n.type};
       return`<option value="${n.id}">[${nt.label}] ${n.label}</option>`;
     }).join("");
