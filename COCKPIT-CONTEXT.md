@@ -213,6 +213,7 @@ Qualquer edição → save() → debounce 700ms → _write()
 | `refreshPeopleGraph()` | Destrói e recria `peopleGraph` (mirror de `_refreshGraph()`) |
 | `initGraph()` | Cria instância `ForceGraph` com nós filtrados por `graphFilter` (Set multi-seleção; vazio = todos os tipos) |
 | `getEffectiveGraphNodes()` | Retorna nós não-derivados do `gNodes` + nós derivados de `projects` (tipo `projeto`) + nós derivados de `people` (tipo `pessoa`) |
+| `ForceGraph.tick()` | Física do grafo (repulsão entre nós, mola nas arestas, atração ao centro). Damping alto (`0.55`) e força de repulsão limitada (`min(1800/d²,6)`) + clamp de velocidade (`±6`) para evitar oscilação/"explosão" visual quando há muitos nós/conexões (ex.: filtro "All") — o grafo assenta rápido em vez de ficar elástico |
 | `switchTab(t)` | Troca a aba ativa |
 | `switchFupTab(t)` | Troca sub-tab do FUP (acomp/info) |
 
