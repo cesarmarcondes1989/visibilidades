@@ -2079,17 +2079,19 @@ class ForceGraph{
     const N=this.nodes,W=this.W,H=this.H;
     for(let i=0;i<N.length;i++)for(let j=i+1;j<N.length;j++){
       const dx=N[j].x-N[i].x,dy=N[j].y-N[i].y,d=Math.sqrt(dx*dx+dy*dy)||1;
-      const f=3000/(d*d);N[i].vx-=dx/d*f;N[i].vy-=dy/d*f;N[j].vx+=dx/d*f;N[j].vy+=dy/d*f;
+      const f=Math.min(1800/(d*d),6);N[i].vx-=dx/d*f;N[i].vy-=dy/d*f;N[j].vx+=dx/d*f;N[j].vy+=dy/d*f;
     }
     for(const e of this.edges){
       const dx=e.tn.x-e.fn.x,dy=e.tn.y-e.fn.y,d=Math.sqrt(dx*dx+dy*dy)||1;
-      const ideal=90-e.intensity*8,f=(d-ideal)*0.05;
+      const ideal=90-e.intensity*8,f=(d-ideal)*0.03;
       const fx=dx/d*f,fy=dy/d*f;
       e.fn.vx+=fx;e.fn.vy+=fy;e.tn.vx-=fx;e.tn.vy-=fy;
     }
+    const maxV=6;
     for(const n of N){
       n.vx+=(W/2-n.x)*0.004;n.vy+=(H/2-n.y)*0.004;
-      n.vx*=0.82;n.vy*=0.82;
+      n.vx*=0.55;n.vy*=0.55;
+      n.vx=Math.max(-maxV,Math.min(maxV,n.vx));n.vy=Math.max(-maxV,Math.min(maxV,n.vy));
       if(n!==this.drag){n.x+=n.vx;n.y+=n.vy;}
       n.x=Math.max(n.r+8,Math.min(W-n.r-8,n.x));n.y=Math.max(n.r+8,Math.min(H-n.r-8,n.y));
     }
