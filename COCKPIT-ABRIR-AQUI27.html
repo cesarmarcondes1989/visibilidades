@@ -527,9 +527,18 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
 
 <div id="view-prateleira" class="view">
   <div class="card card-p" style="margin-top:16px">
-    <div class="card-head"><h2><span class="card-icon" style="background:#FEF3C7">🏷</span>Prateleira</h2><div class="sub">catálogo de recursos e serviços com valor de referência (rate card)</div></div>
-    <div class="kpis" id="kpi-prateleira"></div>
-    <div id="prateleira-board"></div>
+    <div class="card-head"><h2><span class="card-icon" style="background:#FEF3C7">🏷</span>Prateleira</h2><div class="sub">rate card de recursos e serviços · estimador de escopo de desenvolvimento</div></div>
+    <div style="display:flex;gap:8px;margin-bottom:18px">
+      <button class="chip on" id="prat-tab-ratecard" onclick="switchPratTab('ratecard')">📦 Rate Card</button>
+      <button class="chip" id="prat-tab-estimador" onclick="switchPratTab('estimador')">🧮 Estimador Dev</button>
+    </div>
+    <div id="prat-ratecard-wrap">
+      <div class="kpis" id="kpi-prateleira"></div>
+      <div id="prateleira-board"></div>
+    </div>
+    <div id="prat-estimador-wrap" style="display:none">
+      <div id="estimador-body"></div>
+    </div>
   </div>
 </div>
 
@@ -808,6 +817,8 @@ let projects=[], mel=[], dataVision={}, principles=[];
 let budget=[], fup=[];
 let people=[], peopleSkills=[], peopleAch=[];
 let prateleira=[];
+let pratTab='ratecard';
+let estStep=1,estSelected={},estRoles=null,estPhasePct=null,estDevs=4,estContingency=15,estExpanded=null;
 let betFilter=null, graphFilter=new Set(), currentTab="visao", graph=null, peopleGraph=null, _ganttOpen=true;
 let ganttDateFrom=null, ganttDateTo=null, ganttStatusFilter=new Set(), ganttPillarFilter=new Set();
 let peopleGraphFilter=new Set();
@@ -1844,6 +1855,263 @@ function renderBudget(){
 
 }
 
+// ══ ESTIMADOR DEV ════════════════════════════════════════════════════
+const EST_ROLES=[
+  {id:"arq",name:"Arquiteto",    rate:320},
+  {id:"sen",name:"Dev Sênior",   rate:240},
+  {id:"ple",name:"Dev Pleno",    rate:170},
+  {id:"ml", name:"Eng. Dados/ML",rate:260},
+  {id:"qa", name:"QA",           rate:140},
+  {id:"pm", name:"PM / PO",      rate:200},
+  {id:"ux", name:"UX/UI",        rate:160},
+];
+const EST_CATALOG=[
+  {id:"sf",  cat:"Integrações",name:"Integração Salesforce",   desc:"APIs REST/Bulk, sync de contas e casos",  hours:[160,320,560],mix:{arq:10,sen:40,ple:30,qa:10,pm:10}},
+  {id:"sap", cat:"Integrações",name:"Integração SAP",          desc:"RFC/BAPI/OData, ordens, financeiro",       hours:[240,480,800],mix:{arq:15,sen:40,ple:25,qa:10,pm:10}},
+  {id:"api", cat:"Integrações",name:"API Gateway / Middleware",desc:"Orquestração, throttling, auth",           hours:[120,240,400],mix:{arq:20,sen:45,ple:20,qa:10,pm:5}},
+  {id:"feat",cat:"Produto",    name:"Novas Features",          desc:"Pacote de funcionalidades novas",          hours:[80,200,400], mix:{sen:30,ple:40,qa:10,pm:10,ux:10}},
+  {id:"web", cat:"Produto",    name:"Portal Web",              desc:"Frontend, design system, responsivo",      hours:[200,400,680],mix:{arq:5,sen:25,ple:35,qa:10,pm:10,ux:15}},
+  {id:"mob", cat:"Produto",    name:"App Mobile",              desc:"iOS + Android",                            hours:[280,520,880],mix:{arq:5,sen:30,ple:30,qa:15,pm:10,ux:10}},
+  {id:"ia",  cat:"IA & Dados", name:"IA / Machine Learning",   desc:"LLM, RAG, modelos preditivos, MLOps",      hours:[200,440,760],mix:{arq:10,ml:50,sen:15,qa:10,pm:15}},
+  {id:"data",cat:"IA & Dados", name:"Data Platform",           desc:"Pipelines, lakehouse, dashboards",         hours:[240,480,800],mix:{arq:15,ml:45,sen:20,qa:10,pm:10}},
+  {id:"mig", cat:"Fundação",   name:"Migração de Dados",       desc:"ETL legado → novo, validação, cutover",    hours:[120,280,520],mix:{arq:10,ml:30,sen:30,qa:20,pm:10}},
+  {id:"sso", cat:"Fundação",   name:"Segurança & SSO",         desc:"SAML/OIDC, RBAC, auditoria",               hours:[80,160,280], mix:{arq:25,sen:45,qa:15,pm:15}},
+];
+const EST_PHASES=[
+  {id:"disc", name:"Discovery",        color:"#4F70F5",defaultPct:15},
+  {id:"build",name:"Build",            color:"#D97706",defaultPct:60},
+  {id:"test", name:"Testes & Go-live", color:"#F59E0B",defaultPct:15},
+  {id:"hyper",name:"Hypercare",        color:"#0DAF7B",defaultPct:10},
+];
+const EST_COMPLEX=["Baixa","Média","Alta"];
+const EST_CAT_ORDER=["Integrações","Produto","IA & Dados","Fundação"];
+
+function estInit(){
+  if(!estRoles)   estRoles=EST_ROLES.map(r=>({...r}));
+  if(!estPhasePct)estPhasePct=Object.fromEntries(EST_PHASES.map(p=>[p.id,p.defaultPct]));
+}
+
+function switchPratTab(t){
+  pratTab=t;
+  document.getElementById("prat-ratecard-wrap").style.display=t==="ratecard"?"":"none";
+  document.getElementById("prat-estimador-wrap").style.display=t==="estimador"?"":"none";
+  document.getElementById("prat-tab-ratecard").classList.toggle("on",t==="ratecard");
+  document.getElementById("prat-tab-estimador").classList.toggle("on",t==="estimador");
+  if(t==="ratecard")renderPrateleira();
+  if(t==="estimador")renderEstimador();
+}
+
+function estCalc(){
+  estInit();
+  const rateOf=id=>estRoles.find(r=>r.id===id)?.rate??0;
+  const items=EST_CATALOG.filter(i=>i.id in estSelected).map(i=>{
+    const c=estSelected[i.id];
+    const h=Math.round(i.hours[c]*(1+estContingency/100));
+    const price=Object.entries(i.mix).reduce((acc,[rid,pct])=>acc+h*(pct/100)*rateOf(rid),0);
+    return {...i,complexity:c,h,price,blended:h?price/h:0};
+  });
+  const totalHours=items.reduce((a,i)=>a+i.h,0);
+  const totalPrice=items.reduce((a,i)=>a+i.price,0);
+  const phaseTotal=Object.values(estPhasePct).reduce((a,b)=>a+b,0)||1;
+  const phases=EST_PHASES.map(p=>{
+    const pct=estPhasePct[p.id]/phaseTotal;
+    return {...p,pct,h:Math.round(totalHours*pct),price:totalPrice*pct};
+  });
+  const byRole=estRoles.map(r=>{
+    const h=items.reduce((acc,i)=>acc+i.h*((i.mix[r.id]??0)/100),0);
+    return {...r,h:Math.round(h),price:h*r.rate};
+  }).filter(r=>r.h>0);
+  const capacity=estDevs*160;
+  const months=capacity>0?totalHours/capacity:0;
+  const weeks=Math.max(2,Math.ceil(months*4.33));
+  let cursor=0;
+  const gantt=phases.map(p=>{
+    const dur=Math.max(1,weeks*p.pct);
+    const start=cursor;
+    cursor+=dur*0.85;
+    return {...p,start,dur};
+  });
+  const totalWeeks=Math.max(1,Math.ceil(cursor+(gantt[gantt.length-1]?.dur??0)*0.15));
+  return {items,totalHours,totalPrice,phases,byRole,gantt,totalWeeks,months};
+}
+
+function _estFmt(v){return"R$ "+Math.round(v).toLocaleString("pt-BR");}
+
+function _estKpiBox(label,value,sub,accent){
+  return`<div style="background:var(--s);border:1px solid ${accent?"var(--acc)":"var(--border)"};border-radius:10px;padding:10px 16px;min-width:120px">
+    <div style="font-size:10px;letter-spacing:2px;color:var(--muted);text-transform:uppercase">${label}</div>
+    <div style="font-size:18px;font-weight:700;color:${accent?"var(--acc)":"#1E293B"};margin-top:2px">${value}</div>
+    ${sub?`<div style="font-size:11px;color:var(--muted)">${sub}</div>`:""}
+  </div>`;
+}
+
+function renderEstimador(){
+  estInit();
+  const el=document.getElementById("estimador-body");
+  if(!el)return;
+  if(estStep===1){
+    const cnt=Object.keys(estSelected).length;
+    el.innerHTML=`<div>
+      <div style="font-size:11px;letter-spacing:2px;color:var(--muted);text-transform:uppercase;margin-bottom:6px">Passo 1 de 2</div>
+      <div style="font-size:20px;font-weight:700;margin-bottom:20px">Selecione o <span style="color:var(--acc)">escopo</span></div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(440px,1fr));gap:20px">
+        ${EST_CAT_ORDER.map(cat=>`
+          <div>
+            <div style="font-size:11px;font-weight:700;letter-spacing:2px;color:var(--muted);text-transform:uppercase;margin-bottom:10px">${cat}</div>
+            <div style="display:grid;gap:8px">
+              ${EST_CATALOG.filter(i=>i.cat===cat).map(item=>{
+                const on=item.id in estSelected;
+                const c=estSelected[item.id]??1;
+                return`<div onclick="estToggle('${item.id}')" style="border:1px solid ${on?"var(--acc)":"var(--border)"};background:${on?"rgba(79,112,245,0.06)":"var(--s)"};border-radius:10px;padding:14px 16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;cursor:pointer;transition:border-color .15s">
+                  <div style="width:18px;height:18px;border-radius:5px;border:2px solid ${on?"var(--acc)":"var(--border)"};background:${on?"var(--acc)":"transparent"};flex-shrink:0;display:grid;place-items:center;font-size:12px;color:#fff;font-weight:700">${on?"✓":""}</div>
+                  <div style="flex:1;min-width:160px">
+                    <div style="font-weight:600;font-size:14px">${item.name}</div>
+                    <div style="font-size:12px;color:var(--muted)">${item.desc}</div>
+                  </div>
+                  ${on?`<div onclick="event.stopPropagation()" style="display:flex;gap:4px">
+                    ${EST_COMPLEX.map((lbl,ci)=>`<button onclick="estSetComplex('${item.id}',${ci})" style="font-size:11px;padding:5px 10px;border-radius:6px;cursor:pointer;border:1px solid ${c===ci?"var(--acc)":"var(--border)"};background:${c===ci?"var(--acc)":"transparent"};color:${c===ci?"#fff":"var(--muted)"};font-weight:600">${lbl}</button>`).join("")}
+                  </div>`:""}
+                </div>`;
+              }).join("")}
+            </div>
+          </div>
+        `).join("")}
+      </div>
+      <div style="position:sticky;bottom:16px;margin-top:28px;display:flex;justify-content:space-between;align-items:center;background:var(--s);border:1px solid var(--border);border-radius:12px;padding:16px 20px;box-shadow:0 4px 20px rgba(0,0,0,.08)">
+        <div style="font-size:13px;color:var(--muted)">${cnt===0?"Nenhum módulo selecionado":`${cnt} módulo${cnt>1?"s":""} selecionado${cnt>1?"s":""}`}</div>
+        <button onclick="estNext()" ${cnt===0?"disabled":""} style="background:var(--acc);color:#fff;border:none;font-size:14px;font-weight:600;padding:10px 22px;border-radius:8px;cursor:${cnt===0?"not-allowed":"pointer"};opacity:${cnt===0?0.4:1};transition:opacity .15s">Calcular preço e cronograma →</button>
+      </div>
+    </div>`;
+  } else {
+    const calc=estCalc();
+    const phaseTotal=Object.values(estPhasePct).reduce((a,b)=>a+b,0);
+    const tw=Math.max(1,calc.totalWeeks);
+    el.innerHTML=`<div>
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:16px;margin-bottom:20px">
+        <div>
+          <div style="font-size:11px;letter-spacing:2px;color:var(--muted);text-transform:uppercase;margin-bottom:6px">Passo 2 de 2</div>
+          <div style="font-size:20px;font-weight:700">Preço <span style="color:var(--acc)">&amp;</span> Cronograma</div>
+        </div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap">
+          ${_estKpiBox("Investimento",_estFmt(calc.totalPrice),null,true)}
+          ${_estKpiBox("Horas",calc.totalHours.toLocaleString("pt-BR")+" h",null,false)}
+          ${_estKpiBox("Prazo",calc.totalWeeks+" semanas","≈ "+calc.months.toFixed(1)+" meses",false)}
+        </div>
+      </div>
+      <button onclick="estBack()" style="background:transparent;border:1px solid var(--border);color:var(--muted);font-size:12px;padding:7px 14px;border-radius:8px;cursor:pointer;margin-bottom:18px">← Voltar e ajustar seleção</button>
+      <div style="display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:20px">
+        <div>
+          <div style="font-size:11px;font-weight:700;letter-spacing:2px;color:var(--muted);text-transform:uppercase;margin-bottom:10px">Módulos no escopo</div>
+          <div style="display:grid;gap:8px;margin-bottom:20px">
+            ${calc.items.map(item=>{
+              const isExp=estExpanded===item.id;
+              return`<div style="border:1px solid var(--border);background:var(--s);border-radius:10px;overflow:hidden">
+                <div onclick="estExpand('${item.id}')" style="padding:12px 14px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;cursor:pointer">
+                  <div style="flex:1;min-width:150px">
+                    <div style="font-weight:600;font-size:14px">${item.name}</div>
+                    <div style="font-size:11px;color:var(--muted)">${EST_COMPLEX[item.complexity]}</div>
+                  </div>
+                  <div style="text-align:right;min-width:110px">
+                    <div style="font-size:13px;color:var(--acc);font-weight:700">${_estFmt(item.price)}</div>
+                    <div style="font-size:11px;color:var(--muted)">${item.h} h · R$ ${Math.round(item.blended)}/h</div>
+                  </div>
+                  <span style="font-size:11px;color:var(--muted)">${isExp?"▲":"mix ▼"}</span>
+                </div>
+                ${isExp?`<div style="border-top:1px solid var(--border);padding:10px 14px 12px;background:var(--s2)">
+                  ${Object.entries(item.mix).map(([rid,pct])=>{
+                    const role=estRoles.find(r=>r.id===rid);
+                    const h=item.h*(pct/100);
+                    return`<div style="display:grid;grid-template-columns:110px 1fr 55px 90px;gap:8px;font-size:12px;margin-bottom:5px;align-items:center">
+                      <span style="color:var(--muted)">${role?role.name:rid}</span>
+                      <div style="height:5px;background:var(--s3);border-radius:3px"><div style="width:${pct}%;height:100%;background:var(--acc);border-radius:3px;opacity:.7"></div></div>
+                      <span style="color:var(--muted);text-align:right">${Math.round(h)} h</span>
+                      <span style="text-align:right;font-weight:600">${_estFmt(h*(role?role.rate:0))}</span>
+                    </div>`;
+                  }).join("")}
+                </div>`:""}
+              </div>`;
+            }).join("")}
+          </div>
+          <div style="background:var(--s);border:1px solid var(--border);border-radius:12px;padding:18px 20px">
+            <div style="display:flex;justify-content:space-between;margin-bottom:14px">
+              <div style="font-size:11px;font-weight:700;letter-spacing:2px;color:var(--muted);text-transform:uppercase">Cronograma por fase</div>
+              <div style="font-size:12px;color:var(--acc);font-weight:700">${calc.totalWeeks} semanas</div>
+            </div>
+            ${calc.gantt.map(g=>`
+              <div style="display:grid;grid-template-columns:130px 1fr 150px;gap:10px;align-items:center;margin-bottom:10px">
+                <div style="font-size:13px;font-weight:500">${g.name}</div>
+                <div style="height:22px;background:var(--s2);border-radius:5px;position:relative">
+                  <div style="position:absolute;left:${(g.start/tw*100).toFixed(1)}%;width:${(g.dur/tw*100).toFixed(1)}%;top:3px;bottom:3px;border-radius:4px;background:${g.color};min-width:16px"></div>
+                </div>
+                <div style="font-size:11px;color:var(--muted);text-align:right">${g.h} h · ${_estFmt(g.price)}</div>
+              </div>
+            `).join("")}
+          </div>
+        </div>
+        <div style="align-self:start;position:sticky;top:16px;display:grid;gap:14px">
+          <div style="background:var(--s);border:1px solid var(--border);border-radius:12px;padding:16px">
+            <div style="font-size:11px;font-weight:700;letter-spacing:2px;color:var(--muted);text-transform:uppercase;margin-bottom:12px">Taxas por perfil (R$/h)</div>
+            ${estRoles.map(r=>{
+              const agg=calc.byRole.find(x=>x.id===r.id);
+              return`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+                <div>
+                  <div style="font-size:13px;font-weight:500">${r.name}</div>
+                  ${agg?`<div style="font-size:10px;color:var(--muted)">${agg.h} h · ${_estFmt(agg.price)}</div>`:""}
+                </div>
+                <input type="number" value="${r.rate}" min="0" step="10" onchange="estSetRate('${r.id}',+this.value)" style="width:70px;padding:4px 8px;border:1px solid var(--border);border-radius:6px;font-size:13px;font-weight:600;text-align:right;background:var(--s2);color:var(--acc)">
+              </div>`;
+            }).join("")}
+          </div>
+          <div style="background:var(--s);border:1px solid var(--border);border-radius:12px;padding:16px">
+            <div style="display:flex;justify-content:space-between;margin-bottom:12px">
+              <div style="font-size:11px;font-weight:700;letter-spacing:2px;color:var(--muted);text-transform:uppercase">Fases do projeto (%)</div>
+              ${phaseTotal!==100?`<div style="font-size:11px;color:var(--re);font-weight:700">Σ ${phaseTotal}%</div>`:""}
+            </div>
+            ${EST_PHASES.map(p=>`
+              <div style="margin-bottom:10px">
+                <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px">
+                  <span style="display:flex;align-items:center;gap:6px"><span style="width:9px;height:9px;border-radius:3px;background:${p.color};display:inline-block"></span>${p.name}</span>
+                  <span id="estphl_${p.id}" style="color:${p.color};font-weight:700;font-size:12px">${estPhasePct[p.id]}%</span>
+                </div>
+                <input type="range" min="0" max="60" step="5" value="${estPhasePct[p.id]}" oninput="document.getElementById('estphl_${p.id}').textContent=this.value+'%'" onchange="estSetPhase('${p.id}',+this.value)" style="width:100%;accent-color:${p.color}">
+              </div>
+            `).join("")}
+          </div>
+          <div style="background:var(--s);border:1px solid var(--border);border-radius:12px;padding:16px">
+            <div style="font-size:11px;font-weight:700;letter-spacing:2px;color:var(--muted);text-transform:uppercase;margin-bottom:12px">Parâmetros</div>
+            <div style="margin-bottom:10px">
+              <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px">
+                <span style="color:var(--muted)">Squad</span>
+                <span id="estpl_devs" style="color:var(--acc);font-weight:700;font-size:12px">${estDevs} devs</span>
+              </div>
+              <input type="range" min="1" max="12" step="1" value="${estDevs}" oninput="document.getElementById('estpl_devs').textContent=this.value+' devs'" onchange="estUpdateDevs(+this.value)" style="width:100%;accent-color:var(--acc)">
+            </div>
+            <div>
+              <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px">
+                <span style="color:var(--muted)">Contingência</span>
+                <span id="estpl_cont" style="color:var(--acc);font-weight:700;font-size:12px">${estContingency}%</span>
+              </div>
+              <input type="range" min="0" max="40" step="5" value="${estContingency}" oninput="document.getElementById('estpl_cont').textContent=this.value+'%'" onchange="estUpdateContingency(+this.value)" style="width:100%;accent-color:var(--acc)">
+            </div>
+          </div>
+          <button onclick="estReset()" style="background:transparent;border:1px solid var(--border);color:var(--muted);font-size:12px;padding:8px;border-radius:8px;cursor:pointer;width:100%">↺ Reiniciar estimativa</button>
+        </div>
+      </div>
+    </div>`;
+  }
+}
+
+function estToggle(id){if(id in estSelected)delete estSelected[id];else estSelected[id]=1;renderEstimador();}
+function estSetComplex(id,c){estSelected[id]=+c;renderEstimador();}
+function estNext(){if(Object.keys(estSelected).length>0){estStep=2;renderEstimador();}}
+function estBack(){estStep=1;renderEstimador();}
+function estExpand(id){estExpanded=(estExpanded===id?null:id);renderEstimador();}
+function estSetRate(id,v){const r=estRoles.find(r=>r.id===id);if(r)r.rate=+v;renderEstimador();}
+function estSetPhase(id,v){estPhasePct[id]=+v;renderEstimador();}
+function estUpdateDevs(v){estDevs=+v;renderEstimador();}
+function estUpdateContingency(v){estContingency=+v;renderEstimador();}
+function estReset(){estStep=1;estSelected={};estRoles=null;estPhasePct=null;estDevs=4;estContingency=15;estExpanded=null;renderEstimador();}
+
 // ══ RENDER PRATELEIRA ════════════════════════════════════════════════
 function renderPrateleira(){
   const cats=[...new Set(prateleira.map(p=>p.categoria||"Sem categoria"))].sort();
@@ -2641,7 +2909,7 @@ function switchTab(t){
   if(t==="grafo") renderGrafo();
   if(t==="people") renderPeople();
   if(t==="budget") renderBudget();
-  if(t==="prateleira") renderPrateleira();
+  if(t==="prateleira"){if(pratTab==="ratecard")renderPrateleira();else renderEstimador();}
   if(t==="fup") renderFup();
 }
 document.querySelector(".tabs").addEventListener("click",e=>{const b=e.target.closest(".tab");if(b)switchTab(b.dataset.t);});

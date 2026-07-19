@@ -310,7 +310,7 @@ Colunas (`SH.people_achievements`): `id, personId, title, descr, date`.
 | `descr` | texto longo | Descrição |
 | `date` | data (ISO) | Data do achievement |
 
-### 3.21 `prateleira` — Catálogo de itens/recursos reutilizáveis
+### 3.21 `prateleira` — Catálogo de itens/recursos reutilizáveis (sub-tab Rate Card)
 
 Colunas (`SH.prateleira`): `id, name, categoria, valor, moeda, unidade, notas`.
 
@@ -323,6 +323,10 @@ Colunas (`SH.prateleira`): `id, name, categoria, valor, moeda, unidade, notas`.
 | `moeda` | enum | `BRL`\|`USD`\|`EUR` (símbolos: R$, US$, €) |
 | `unidade` | enum | `hora`\|`dia`\|`mes`\|`ano`\|`projeto`\|`unico` (rótulos: "Por hora", "Por dia", "Por mês", "Por ano", "Por projeto", "Valor único") |
 | `notas` | texto longo | Notas livres |
+
+### 3.22 Estimador Dev — dados transientes (não persistidos)
+
+O sub-tab "Estimador Dev" (dentro da aba Prateleira) **não tem tabela no Excel**. Todo o estado vive nos globals `est*` (runtime apenas) e é descartado ao recarregar a página ou ao clicar em "↺ Reiniciar estimativa". Não há `SH.*` para o estimador. Os catálogos (`EST_ROLES`, `EST_CATALOG`, `EST_PHASES`) são constantes hard-coded no script.
 
 ## 4. Relacionamentos (chaves lógicas)
 
