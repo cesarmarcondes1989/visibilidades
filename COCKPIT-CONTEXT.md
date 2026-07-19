@@ -92,6 +92,16 @@ let peopleSkills = [];    // skills de cada pessoa (fk personId), uma linha por 
 let peopleAch    = [];    // achievements de cada pessoa (fk personId) — {id, personId, title, descr, date}
 let prateleira   = [];    // catálogo de recursos/serviços (Prateleira tab) — {id, name, categoria, valor, moeda, unidade, notas}
 
+// Estimador Dev (runtime apenas — não persistido, nunca gravado no Excel)
+let pratTab      = 'ratecard';  // sub-tab ativo da Prateleira: 'ratecard' | 'estimador'
+let estStep      = 1;           // passo do estimador: 1=seleção, 2=cálculo
+let estSelected  = {};          // { [catalogItemId]: complexityIndex 0|1|2 }
+let estRoles     = null;        // array de perfis com rate editável (lazy-init de EST_ROLES)
+let estPhasePct  = null;        // { disc, build, test, hyper } — % de esforço por fase (lazy-init)
+let estDevs      = 4;           // tamanho do squad
+let estContingency = 15;        // % de contingência sobre as horas base
+let estExpanded  = null;        // id do módulo expandido para ver o mix de perfis (step 2)
+
 // Runtime only (não persistido)
 let betFilter    = null;
 let graphFilter  = new Set(); // filtro multi-seleção por tipo de nó do grafo principal (vazio = todos os tipos)
@@ -203,7 +213,13 @@ Qualquer edição → save() → debounce 700ms → _write()
 | `_pdate(s)` | Helper: converte string em `Date` válido ou `null` |
 | `renderMelhorias()` | Aba Improvements & SF |
 | `renderBudget()` | Aba Budget — KPIs + tabela por categoria com `<meter>` |
-| `renderPrateleira()` | Aba Prateleira — KPIs + tabela por categoria com valor formatado por moeda/unidade (`fmtMoeda`) |
+| `renderPrateleira()` | Sub-tab "Rate Card" da Prateleira — KPIs + tabela por categoria com valor formatado por moeda/unidade (`fmtMoeda`) |
+| `renderEstimador()` | Sub-tab "Estimador Dev" da Prateleira — step 1 (seleção de módulos) ou step 2 (preço + Gantt + painel de parâmetros) conforme `estStep` |
+| `switchPratTab(t)` | Troca sub-tab da Prateleira: `'ratecard'` mostra `#prat-ratecard-wrap` e chama `renderPrateleira()`; `'estimador'` mostra `#prat-estimador-wrap` e chama `renderEstimador()` |
+| `estCalc()` | Cálculo puro do estimador — retorna `{items, totalHours, totalPrice, phases, byRole, gantt, totalWeeks, months}` |
+| `estInit()` | Lazy-init de `estRoles` e `estPhasePct` a partir de `EST_ROLES`/`EST_PHASES` (só popula se `null`) |
+| `_estFmt(v)` | Formata número como `"R$ X.XXX"` (sem compactação, para o estimador) |
+| `_estKpiBox(label,value,sub,accent)` | HTML de um card KPI do header do step 2 do estimador |
 | `renderFup()` | Aba FUP — kanban Acompanhamento + lista Informativo |
 | `renderAdmin()` | Aba Admin |
 | `renderPeople()` | Aba People — KPIs + board de cards (`personCard`) + chama `renderPeopleGraphView()` |
@@ -217,6 +233,16 @@ Qualquer edição → save() → debounce 700ms → _write()
 | `ForceGraph.tick()` | Física do grafo (repulsão entre nós, mola nas arestas, atração ao centro). Damping alto (`0.55`) e força de repulsão limitada (`min(1800/d²,6)`) + clamp de velocidade (`±6`) para evitar oscilação/"explosão" visual quando há muitos nós/conexões (ex.: filtro "All") — o grafo assenta rápido em vez de ficar elástico |
 | `switchTab(t)` | Troca a aba ativa |
 | `switchFupTab(t)` | Troca sub-tab do FUP (acomp/info) |
+| `estToggle(id)` | Marca/desmarca módulo no step 1 do estimador e re-renderiza |
+| `estSetComplex(id,c)` | Define complexidade (0/1/2) de um módulo selecionado e re-renderiza |
+| `estNext()` | Avança do step 1 para o step 2 (só se houver pelo menos 1 módulo selecionado) |
+| `estBack()` | Volta do step 2 para o step 1 |
+| `estExpand(id)` | Expande/recolhe o accordion de mix de perfis de um módulo no step 2 |
+| `estSetRate(id,v)` | Atualiza a taxa R$/h de um perfil e re-renderiza o step 2 |
+| `estSetPhase(id,v)` | Atualiza o % de esforço de uma fase e re-renderiza o step 2 |
+| `estUpdateDevs(v)` | Atualiza o tamanho do squad e re-renderiza o step 2 |
+| `estUpdateContingency(v)` | Atualiza o % de contingência e re-renderiza o step 2 |
+| `estReset()` | Reinicia o estimador do zero (seta `estRoles=null`/`estPhasePct=null` para forçar re-init de defaults) |
 
 ### Painéis de Edição (abrem o side panel)
 | Função | Abre painel para |
@@ -263,8 +289,14 @@ Tanto `openAddEdgePanel(fromId, personId?)` quanto `openAddEdgePanelGlobal()` us
 ### Budget — barra de execução
 Usa `<meter>` HTML nativo (não `<div>`) com CSS customizado via `::-webkit-meter-*` para manter o visual consistente com o design system. Cores automáticas por threshold via atributos `low`, `high`, `optimum`. Parsing numérico defensivo via `parseFloat(String(v).replace(/[^0-9.]/g,""))` para lidar com valores do SheetJS que podem chegar como string.
 
-### Prateleira — catálogo de recursos/serviços (rate card)
-Catálogo simples de itens reutilizáveis para referência de custo (ex.: "Recurso Engenharia — US$ 55/hora", "Suporte — R$ 10 mil/mês"), agrupado por categoria igual ao Budget, mas **multi-moeda** (`moeda`: BRL/USD/EUR) e com unidade de cobrança (`unidade`: hora/dia/mês/ano/projeto/único). Como cada item pode estar numa moeda diferente, não há somatório de valores nos KPIs — só contagens (Itens/Categorias/Moedas). Formatação de valor via `fmtMoeda(v, moeda)` (mirror de `fmtBRL` mas parametrizado por símbolo de moeda, `CUR_SYM`) + sufixo de unidade via `UNIDADE_LABEL`. CRUD via side panel padrão (`openPrateleira`/`#panel`), sem modal central — não tem sub-entidades (skills/achievements/subprojetos) como People/Data Product, então não precisou do `#dpModalWrap`. Ainda não conectado a outras abas (ex.: Budget) — fica como catálogo de referência manual por enquanto.
+### Prateleira — sub-tabs: Rate Card e Estimador Dev
+A aba Prateleira tem dois sub-tabs, alternados por `switchPratTab(t)`:
+- **Rate Card** (`prat-ratecard-wrap`): catálogo de itens reutilizáveis para referência de custo (ex.: "Recurso Engenharia — US$ 55/hora"), agrupado por categoria, multi-moeda (BRL/USD/EUR), com unidade de cobrança. CRUD via side panel padrão (`openPrateleira`). Persiste no Excel.
+- **Estimador Dev** (`prat-estimador-wrap`): calculadora de preço & cronograma de projetos de desenvolvimento, portada do componente React `calculadoradevv3.tsx` para vanilla JS. **Não persiste no Excel** — estado transiente nos globals `est*`. Dois passos:
+  - **Step 1** — grade de módulos do catálogo (`EST_CATALOG`, 10 itens em 4 categorias) com toggle de seleção e escolha de complexidade (Baixa/Média/Alta).
+  - **Step 2** — painel de resultado: KPIs (Investimento/Horas/Prazo), lista de módulos com accordion de mix de perfis, Gantt das 4 fases com posicionamento proporcional à semana, e painel de parâmetros fixo (taxas R$/h por perfil, % por fase, tamanho do squad, contingência). Tudo recalcula via `estCalc()` a cada mudança nos controles (sliders usam `onchange` para re-render e `oninput` para atualizar o display span sem re-render).
+
+Constantes do estimador: `EST_ROLES` (7 perfis), `EST_CATALOG` (10 módulos), `EST_PHASES` (4 fases), `EST_COMPLEX`, `EST_CAT_ORDER`.
 
 ### Portfolio — 4 tipos de retorno (USD)
 Cada projeto tem investimento (`inv`) + 4 campos de ganho independentes — `costAvoidance`, `costReduction`, `efficiencyGains`, `revenue` — todos em **USD** (formatados via `fmtMoeda(v,"USD")`, não `fmtBRL`; distinto do resto do app, que é BRL por padrão). `projReturn(p)` soma os 4 campos para obter o retorno total de um projeto, usado no badge de ROI por card (`roi(p.inv, projReturn(p))`) e na linha financeira do card (`Invest`/`Return`). Não há campo único `rec` em `projects` (esse campo só existe em `melhorias`, que é uma entidade não relacionada).
