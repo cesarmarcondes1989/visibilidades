@@ -91,6 +91,7 @@ let people       = [];    // pessoas (People tab) — {id, name, cargo}
 let peopleSkills = [];    // skills de cada pessoa (fk personId), uma linha por skill
 let peopleAch    = [];    // achievements de cada pessoa (fk personId) — {id, personId, title, descr, date}
 let prateleira   = [];    // catálogo de recursos/serviços (Prateleira tab) — {id, name, categoria, valor, moeda, unidade, notas}
+let pipeline     = [];    // projetos em avaliação/pipeline (seção do Portfolio) — {id, name, descr, responsavel, inv, retorno}
 
 // Estimador Dev (runtime apenas — não persistido, nunca gravado no Excel)
 let pratTab      = 'ratecard';  // sub-tab ativo da Prateleira: 'ratecard' | 'estimador'
@@ -214,6 +215,7 @@ Qualquer edição → save() → debounce 700ms → _write()
 | `renderMelhorias()` | Aba Improvements & SF |
 | `renderBudget()` | Aba Budget — KPIs + tabela por categoria com `<meter>` |
 | `renderPrateleira()` | Sub-tab "Rate Card" da Prateleira — KPIs + tabela por categoria com valor formatado por moeda/unidade (`fmtMoeda`) |
+| `renderPipeline()` | Seção Pipeline dentro do Portfolio — tabela de próximos projetos com totalizadores de Investimento e Retorno Esperado; chamada ao final de `renderPortfolio()` |
 | `renderEstimador()` | Sub-tab "Estimador Dev" da Prateleira — step 1 (seleção de módulos) ou step 2 (preço + Gantt + painel de parâmetros) conforme `estStep` |
 | `switchPratTab(t)` | Troca sub-tab da Prateleira: `'ratecard'` mostra `#prat-ratecard-wrap` e chama `renderPrateleira()`; `'estimador'` mostra `#prat-estimador-wrap` e chama `renderEstimador()` |
 | `estCalc()` | Cálculo puro do estimador — retorna `{items, totalHours, totalPrice, phases, byRole, gantt, totalWeeks, months}` |
@@ -255,6 +257,7 @@ Qualquer edição → save() → debounce 700ms → _write()
 | `openMel(id)` | Improvement/SF initiative (null = novo) |
 | `openBudget(id)` | Item de custo Budget (null = novo) |
 | `openPrateleira(id)` | Item da Prateleira (null = novo) |
+| `openPipeline(id)` | Item do Pipeline (null = novo) — nome, descrição, responsável, investimento (US$), retorno esperado (US$) |
 | `openFup(id)` | Atividade FUP (null = novo) |
 | `openThemePanel(i)` | Vision theme |
 | `openPrinciplePanel(i)` | Data principle |
