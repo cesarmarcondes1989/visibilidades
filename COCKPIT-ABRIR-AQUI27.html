@@ -489,6 +489,7 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
       </div>
     </div>
     <div id="portfolio-board"></div>
+    <div id="pipeline-section"></div>
   </div>
 </div>
 
@@ -817,6 +818,7 @@ let projects=[], mel=[], dataVision={}, principles=[];
 let budget=[], fup=[];
 let people=[], peopleSkills=[], peopleAch=[];
 let prateleira=[];
+let pipeline=[];
 let pratTab='ratecard';
 let estStep=1,estSelected={},estRoles=null,estPhasePct=null,estDevs=4,estContingency=15,estExpanded=null;
 let betFilter=null, graphFilter=new Set(), currentTab="visao", graph=null, peopleGraph=null, _ganttOpen=true;
@@ -887,7 +889,7 @@ function seedAll(){
   principles=clone(DEFAULT_DATA_VISION.principles);
   pillars=clone(PILLARS); domains=clone(DOMAINS);
   people=[]; peopleSkills=[]; peopleAch=[];
-  prateleira=[];
+  prateleira=[]; pipeline=[];
   refreshPMAP(); refreshDMAP();
 }
 
@@ -909,7 +911,8 @@ const SH={
   people:             ["id","name","cargo"],
   people_skills:      ["id","personId","skill"],
   people_achievements:["id","personId","title","descr","date"],
-  prateleira:         ["id","name","categoria","valor","moeda","unidade","notas"]
+  prateleira:         ["id","name","categoria","valor","moeda","unidade","notas"],
+  pipeline:           ["id","name","descr","responsavel","inv","retorno"]
 };
 
 function _kv(wb,name){
@@ -975,6 +978,7 @@ function buildWB(){
   add("people_skills",        _list2ws(peopleSkills,SH.people_skills));
   add("people_achievements",  _list2ws(peopleAch,   SH.people_achievements));
   add("prateleira",           _list2ws(prateleira,  SH.prateleira));
+  add("pipeline",             _list2ws(pipeline,    SH.pipeline));
   return wb;
 }
 function parseWB(wb){
@@ -1002,6 +1006,7 @@ function parseWB(wb){
     people_skills:       _list(wb,"people_skills"),
     people_achievements: _list(wb,"people_achievements"),
     prateleira:          _list(wb,"prateleira"),
+    pipeline:            _list(wb,"pipeline"),
   };
   console.log("[Cockpit] bets:",out.bets.length,"| projects:",out.projects.length,
     "| dp:",out.data_products.length,"| intent:",(out.vision.intent||"").slice(0,40));
@@ -1032,6 +1037,7 @@ function applyData(o){
   if(o.people_skills?.length)       peopleSkills=o.people_skills;
   if(o.people_achievements?.length) peopleAch   =o.people_achievements;
   if(o.prateleira?.length)          prateleira  =o.prateleira;
+  if(o.pipeline?.length)            pipeline    =o.pipeline;
   console.log("[Cockpit] applyData bets:",bets.length,"| dp:",dp.length,"| pillars:",pillars.length,"| domains:",domains.length);
 }
 
@@ -1533,6 +1539,47 @@ function renderPortfolio(){
       <div class="proj-cards">${cards}</div>
     </div>`;
   }).join("");
+  renderPipeline();
+}
+
+// ══ RENDER PIPELINE ══════════════════════════════════════════════════
+function renderPipeline(){
+  const el=document.getElementById("pipeline-section");
+  if(!el)return;
+  const totInv=pipeline.reduce((s,p)=>s+(+p.inv||0),0);
+  const totRet=pipeline.reduce((s,p)=>s+(+p.retorno||0),0);
+  el.innerHTML=`
+    <div style="margin-top:28px;border-top:2px solid var(--border);padding-top:22px">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;flex-wrap:wrap">
+        <span style="font-size:18px">🔭</span>
+        <span style="font-size:16px;font-weight:700">Pipeline — Próximos Projetos</span>
+        <span style="font-size:12px;color:var(--muted);flex:1">oportunidades e projetos em avaliação</span>
+        ${pipeline.length>0?`<span style="font-size:12px;color:var(--muted);white-space:nowrap">${pipeline.length} item${pipeline.length>1?"s":""} · Invest: ${fmtMoeda(totInv,"USD")} · Retorno: ${fmtMoeda(totRet,"USD")}</span>`:""}
+        <button onclick="openPipeline(null)" style="background:var(--acc);color:#fff;border:none;font-size:12px;font-weight:600;padding:7px 14px;border-radius:8px;cursor:pointer;flex-shrink:0">+ Adicionar</button>
+      </div>
+      ${pipeline.length===0
+        ?`<div style="text-align:center;padding:32px;color:var(--muted);font-size:13px;background:var(--s2);border-radius:10px;border:1px dashed var(--border)">Nenhum item no pipeline.<br>Clique em <b>+ Adicionar</b> para registrar o próximo projeto.</div>`
+        :`<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:13px">
+          <thead><tr style="color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.05em;border-bottom:2px solid var(--border)">
+            <th style="text-align:left;padding:8px 10px;font-weight:600">Nome</th>
+            <th style="text-align:left;padding:8px 10px;font-weight:600">Descrição</th>
+            <th style="text-align:left;padding:8px 10px;font-weight:600">Responsável</th>
+            <th style="text-align:right;padding:8px 10px;font-weight:600;width:140px">Investimento</th>
+            <th style="text-align:right;padding:8px 10px;font-weight:600;width:140px">Retorno Esperado</th>
+            <th style="width:28px"></th>
+          </tr></thead>
+          <tbody>${pipeline.map((p,i)=>`
+            <tr class="pip-row" data-pipid="${p.id}" style="border-top:1px solid var(--border);cursor:pointer${i%2===1?";background:var(--s2)":""}">
+              <td style="padding:10px 10px;font-weight:600">${p.name||"—"}</td>
+              <td style="padding:10px 10px;color:var(--muted);max-width:240px">${p.descr||""}</td>
+              <td style="padding:10px 10px">${p.responsavel||"—"}</td>
+              <td style="padding:10px 10px;text-align:right;font-weight:700">${fmtMoeda(+p.inv||0,"USD")}</td>
+              <td style="padding:10px 10px;text-align:right;color:var(--gr);font-weight:700">${fmtMoeda(+p.retorno||0,"USD")}</td>
+              <td style="padding:4px;text-align:center"><button onclick="event.stopPropagation();openPipeline('${p.id}')" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:15px">✎</button></td>
+            </tr>`).join("")}
+          </tbody>
+        </table></div>`}
+    </div>`;
 }
 
 // ══ RENDER MELHORIAS ═════════════════════════════════════════════════
@@ -2876,6 +2923,26 @@ function openProject(id){
   if(!isNew)document.getElementById("dlBtn").onclick=()=>{if(confirm("Delete?")){{projects=projects.filter(x=>x.id!==id);save();renderPortfolio();closePanel();toast("Deleted");}}};
   openPanel();
 }
+function openPipeline(id){
+  const p=pipeline.find(x=>x.id===id)||{};const isNew=!id;editCtx={type:"pipeline",id};
+  document.getElementById("panelTitle").textContent=isNew?"Novo Pipeline":"Editar Pipeline";
+  document.getElementById("panelBody").innerHTML=
+    fld("Nome do projeto","name",p.name)+
+    ta("Descrição","descr",p.descr)+
+    fld("Responsável","responsavel",p.responsavel)+
+    fld("Investimento (US$)","inv",p.inv||0,"number")+
+    fld("Retorno Esperado (US$)","retorno",p.retorno||0,"number");
+  document.getElementById("panelFoot").innerHTML=`<button class="primary" id="svBtn">Save</button>${!isNew?`<button class="danger" id="dlBtn">Delete</button>`:""}`;
+  bindSliders();
+  document.getElementById("svBtn").onclick=()=>{
+    const d={name:gv("name"),descr:gv("descr"),responsavel:gv("responsavel"),inv:+gv("inv"),retorno:+gv("retorno")};
+    if(isNew){pipeline.push({id:"pip"+Date.now(),...d});toast("Pipeline adicionado");}
+    else{Object.assign(pipeline.find(x=>x.id===id),d);toast("Salvo");}
+    save();renderPipeline();closePanel();
+  };
+  if(!isNew)document.getElementById("dlBtn").onclick=()=>{if(confirm("Excluir do pipeline?")){{pipeline=pipeline.filter(x=>x.id!==id);save();renderPipeline();closePanel();toast("Excluído");}}};
+  openPanel();
+}
 function openMel(id){
   const m=mel.find(x=>x.id===id)||{};const isNew=!id;editCtx={type:"mel",id};
   document.getElementById("panelTitle").textContent=isNew?"Nova Iniciativa":"Editar Iniciativa";
@@ -2936,6 +3003,8 @@ document.getElementById("view-portfolio").addEventListener("click",e=>{
   if(gpl){const v=gpl.dataset.gpl;if(!v)ganttPillarFilter.clear();else ganttPillarFilter.has(v)?ganttPillarFilter.delete(v):ganttPillarFilter.add(v);renderPortfolio();return;}
   const c=e.target.closest(".p-card,.g-bar,.g-label");
   if(c&&c.dataset.pid)openProject(c.dataset.pid);
+  const pip=e.target.closest(".pip-row");
+  if(pip&&pip.dataset.pipid)openPipeline(pip.dataset.pipid);
 });
 document.getElementById("view-people").addEventListener("click",e=>{
   const c=e.target.closest(".person-card");if(c){openPerson(c.dataset.pid);return;}

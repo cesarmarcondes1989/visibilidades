@@ -41,6 +41,7 @@
 | `people_skills` | lista | Skills associadas a uma pessoa | sim — `psk<timestamp>` |
 | `people_achievements` | lista | Achievements associados a uma pessoa | sim — `pach<timestamp>` |
 | `prateleira` | lista | Itens de "prateleira" (catálogo de recursos/custos reutilizáveis) | sim — `pt<timestamp>` |
+| `pipeline` | lista | Projetos em avaliação / pipeline do Portfolio | sim — `pip<timestamp>` |
 
 > ⚠️ **Nós derivados/virtuais**: nós do tipo `projeto` e `pessoa` **NÃO** existem na aba `graph_nodes` — eles são calculados em tempo de execução a partir das tabelas `projects` e `people` pela função `getEffectiveGraphNodes()`. O ID do nó derivado de um projeto é `"pj-" + projeto.id`; o de uma pessoa é `"pe-" + pessoa.id`. Ao reconstruir/ler o Excel, a aba `graph_nodes` é explicitamente filtrada para excluir esses dois tipos. Qualquer leitor do dataset (incluindo Copilot) deve tratar a lista completa de nós do grafo como **`graph_nodes` (pilar/produto/dominio) + nós derivados de `projects` + nós derivados de `people`**, nunca apenas `graph_nodes`.
 
@@ -324,7 +325,22 @@ Colunas (`SH.prateleira`): `id, name, categoria, valor, moeda, unidade, notas`.
 | `unidade` | enum | `hora`\|`dia`\|`mes`\|`ano`\|`projeto`\|`unico` (rótulos: "Por hora", "Por dia", "Por mês", "Por ano", "Por projeto", "Valor único") |
 | `notas` | texto longo | Notas livres |
 
-### 3.22 Estimador Dev — dados transientes (não persistidos)
+### 3.22 `pipeline` — Projetos em avaliação (Pipeline)
+
+Colunas (`SH.pipeline`): `id, name, descr, responsavel, inv, retorno`.
+
+| Coluna | Tipo | Observações |
+|---|---|---|
+| `id` | string | `"pip"+Date.now()` |
+| `name` | texto | Nome do projeto em avaliação (obrigatório) |
+| `descr` | texto longo | Descrição superficial da oportunidade |
+| `responsavel` | texto | Pessoa responsável pela avaliação |
+| `inv` | número (US$) | Investimento estimado |
+| `retorno` | número (US$) | Retorno esperado estimado |
+
+Exibido como seção 🔭 **Pipeline — Próximos Projetos** abaixo do board de projetos do Portfolio, com totalizadores de Investimento e Retorno no cabeçalho da seção. Não tem status (é pré-projeto); sem FK com `projects` (pipeline → projeto é uma transição manual quando o projeto é formalizado). CRUD via side panel padrão (`openPipeline`).
+
+### 3.23 Estimador Dev — dados transientes (não persistidos)
 
 O sub-tab "Estimador Dev" (dentro da aba Prateleira) **não tem tabela no Excel**. Todo o estado vive nos globals `est*` (runtime apenas) e é descartado ao recarregar a página ou ao clicar em "↺ Reiniciar estimativa". Não há `SH.*` para o estimador. Os catálogos (`EST_ROLES`, `EST_CATALOG`, `EST_PHASES`) são constantes hard-coded no script.
 
